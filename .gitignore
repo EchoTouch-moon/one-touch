@@ -1,0 +1,57 @@
+# Python-generated files
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Database
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Runtime data
+logs/
+backups/
+*.log
+*.jsonl
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude / agent state
+.claude/
+
+# Local scratch
+temp/
+tmp/
+
+# Personal docs (not project-related)
+AI开发.md
+简历.md
+
+# Stylus diagnostic dumps (kept locally, never committed)
+stylus diagnostics.jpg
+stylus-diagnostics-*.json
+*diagnostics*.json

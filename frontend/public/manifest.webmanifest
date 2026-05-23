@@ -1,0 +1,45 @@
+{
+  "name": "一触",
+  "short_name": "一触",
+  "description": "Write vocabulary definitions by hand and review them anywhere.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 72x72 96x96 128x128 192x192 256x256 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Review",
+      "short_name": "Review",
+      "url": "/review",
+      "description": "Start reviewing due words"
+    },
+    {
+      "name": "Capture",
+      "short_name": "Capture",
+      "url": "/capture",
+      "description": "Capture a new word"
+    }
+  ]
+}
