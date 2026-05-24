@@ -4,7 +4,7 @@
 
 一触是一个以手写释义卡为核心的自托管背单词应用，支持平板手写、SM-2 间隔重复、离线复习和可选 LLM 增强。
 
-**在线体验：** [example.com/settings](https://example.com/settings)
+**在线体验：** [moonpulse.online](https://moonpulse.online)
 
 ## 亮点
 
@@ -20,7 +20,7 @@
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/capture-handwriting.jpg" alt="收词手写" /></td>
-    <td width="50%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="复习手写卡" /></td>
+    <td width="50%"><img src="docs/screenshots/settings-runtime.png" alt="运行状态" /></td>
   </tr>
 </table>
 
@@ -28,7 +28,7 @@
   <tr>
     <td width="33%"><img src="docs/screenshots/word-detail.jpg" alt="单词详情" /></td>
     <td width="33%"><img src="docs/screenshots/mobile-review.jpg" alt="移动端复习" /></td>
-    <td width="33%"><img src="docs/screenshots/settings-runtime.png" alt="运行状态" /></td>
+    <td width="33%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="复习手写卡" /></td>
   </tr>
 </table>
 

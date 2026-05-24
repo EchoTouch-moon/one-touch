@@ -6,7 +6,7 @@
 
 一触 is a self-hosted vocabulary app built around handwriting-first capture, SM-2 review, offline-friendly workflows, and optional LLM enrichment.
 
-**在线体验:** [moonpulse.online/settings](https://moonpulse.online/settings)
+**在线体验:** [moonpulse.online](https://moonpulse.online)
 
 ## Highlights
 
@@ -22,7 +22,7 @@
 <table>
   <tr>
     <td width="50%"><img src="docs/screenshots/capture-handwriting.jpg" alt="Capture with handwriting" /></td>
-    <td width="50%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="Review handwritten card" /></td>
+    <td width="50%"><img src="docs/screenshots/settings-runtime.png" alt="Settings runtime" /></td>
   </tr>
 </table>
 
@@ -30,7 +30,7 @@
   <tr>
     <td width="33%"><img src="docs/screenshots/word-detail.jpg" alt="Word detail" /></td>
     <td width="33%"><img src="docs/screenshots/mobile-review.jpg" alt="Mobile review" /></td>
-    <td width="33%"><img src="docs/screenshots/settings-runtime.png" alt="Settings runtime" /></td>
+    <td width="33%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="Review handwritten card" /></td>
   </tr>
 </table>
 
