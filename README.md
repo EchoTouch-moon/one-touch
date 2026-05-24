@@ -6,7 +6,7 @@
 
 一触 is a self-hosted vocabulary app built around handwriting-first capture, SM-2 review, offline-friendly workflows, and optional LLM enrichment.
 
-**在线体验:** [example.com](https://example.com)
+**在线体验:** [moonpulse.online](https://moonpulse.online)
 
 ## Highlights
 
