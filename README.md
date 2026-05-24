@@ -6,7 +6,7 @@
 
 一触 is a self-hosted vocabulary app built around handwriting-first capture, SM-2 review, offline-friendly workflows, and optional LLM enrichment.
 
-**在线体验:** [moonpulse.online](https://moonpulse.online)
+**在线体验:** [example.com](https://example.com)
 
 ## Highlights
 
@@ -32,7 +32,7 @@
     <td width="33%"><img src="docs/screenshots/mobile-review.jpg" alt="Mobile review" /></td>
     <td width="33%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="Review handwritten card" /></td>
   </tr>
-</table>
+</table>>
 
 ## What it does
 
@@ -103,40 +103,3 @@ docs/      docs and deployment notes
 ## License
 
 MIT
-
----
-
-<a name="english"></a>
-## English Documentation
-
-One Touch is a self-hosted vocabulary application that puts handwriting at the center of the learning experience.
-
-### Core Philosophy
-
-Unlike traditional vocabulary apps that rely on typed definitions, One Touch lets you write meanings by hand—creating a personal, memorable connection with each word.
-
-### Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **Handwriting Canvas** | Full-screen canvas for natural handwritten definitions |
-| **SM-2 Algorithm** | Scientifically-proven spaced repetition for optimal retention |
-| **Offline Support** | Review queue works without internet connection |
-| **LLM Enrichment** | Optional AI-powered phonetics, examples, and usage notes |
-| **Self-Hosted** | Your data stays on your server |
-
-### Quick Start
-
-1. Clone the repository
-2. Set up environment variables (see `.env.example`)
-3. Run backend: `uv run uvicorn backend.main:app --reload`
-4. Run frontend: `npm run dev`
-
-### Supported LLM Providers
-
-- OpenAI (GPT-4, GPT-3.5)
-- Anthropic (Claude)
-- Doubao (ByteDance)
-- Ollama (Local)
-
-For detailed Chinese documentation, see [README.zh-CN.md](README.zh-CN.md).
