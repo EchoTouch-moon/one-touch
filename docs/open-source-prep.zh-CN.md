@@ -63,3 +63,31 @@ cd /path/to/glm-words-public
 rg -n "moonpulse|82\\.157|鲁ICP备|DOUBAO_API_KEY|SMTP_PASSWORD|AUTH_SECRET|sk-"
 find . -name "*.db" -o -name "*.log" -o -name "*.jsonl"
 ```
+
+## 同步到公开仓库
+
+如果公开仓库已经存在，例如本机的 `/Users/v/new-idea/one touch`，可以用同步脚本把私有仓库当前内容导出、脱敏并覆盖到公开仓库工作区：
+
+```bash
+python3 scripts/sync_open_source.py
+```
+
+同步脚本会保留公开仓库的 `.git`，删除并重建其他文件，然后运行安全扫描。为了避免误覆盖手工改动，目标仓库有未提交内容时脚本会停止。先在公开仓库提交或 stash 后再同步。
+
+同步后自动在公开仓库提交：
+
+```bash
+python3 scripts/sync_open_source.py --commit
+```
+
+使用当前私有仓库的 `post-commit` hook 自动同步并提交公开仓库：
+
+```bash
+python3 scripts/sync_open_source.py --install-hook
+```
+
+只检查公开仓库是否包含敏感内容：
+
+```bash
+python3 scripts/sync_open_source.py --check-only
+```

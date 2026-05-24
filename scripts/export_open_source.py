@@ -27,6 +27,7 @@ SKIP_DIRS = {
 
 SKIP_NAMES = {
     ".DS_Store",
+    ".env",
     "words.db",
     "stylus diagnostics.jpg",
     "AI开发.md",
@@ -39,6 +40,10 @@ SKIP_PATTERNS = [
     "*.sqlite3",
     "*.db-shm",
     "*.db-wal",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    ".env.test",
     "*.log",
     "*.jsonl",
     "stylus-diagnostics-*.json",
@@ -58,6 +63,8 @@ TEXT_EXTS = {
     ".svg", ".conf", ".example",
 }
 
+TEXT_NAMES = {".gitignore", "Dockerfile.backend", "docker-compose.yml", "nginx.conf"}
+
 
 def should_skip(path: Path) -> bool:
     if path.name in SKIP_NAMES:
@@ -68,25 +75,19 @@ def should_skip(path: Path) -> bool:
 
 
 def rewrite_text(content: str, rel: Path) -> str:
-    if rel.as_posix() not in {"README.md", "README.zh-CN.md"}:
-        content = re.sub(r"moonpulse\.online", "example.com", content, flags=re.IGNORECASE)
+    content = re.sub(r"moonpulse\.online", "example.com", content, flags=re.IGNORECASE)
     for pattern, replacement in TEXT_REWRITES:
         content = pattern.sub(replacement, content)
     return content
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Export a sanitized open-source copy of the project.")
-    parser.add_argument("destination", help="Target directory for the public copy")
-    args = parser.parse_args()
-
-    src = Path.cwd()
-    dst = Path(args.destination).expanduser().resolve()
+def export_open_source(src: Path, dst: Path) -> None:
+    src = src.resolve()
+    dst = dst.expanduser().resolve()
     if dst == src or src in dst.parents:
-        raise SystemExit("Destination must be outside the project directory.")
-    if dst.exists():
-        if any(dst.iterdir()):
-            raise SystemExit(f"Destination is not empty: {dst}")
+        raise ValueError("Destination must be outside the project directory.")
+    if dst.exists() and any(dst.iterdir()):
+        raise ValueError(f"Destination is not empty: {dst}")
     dst.mkdir(parents=True, exist_ok=True)
 
     for path in src.rglob("*"):
@@ -98,7 +99,7 @@ def main() -> int:
             target.mkdir(parents=True, exist_ok=True)
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        if path.suffix.lower() in TEXT_EXTS or path.name in {".gitignore", "Dockerfile.backend", "docker-compose.yml", "nginx.conf"}:
+        if path.suffix.lower() in TEXT_EXTS or path.name in TEXT_NAMES:
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
@@ -107,6 +108,19 @@ def main() -> int:
                 target.write_text(rewrite_text(text, rel), encoding="utf-8")
         else:
             shutil.copy2(path, target)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Export a sanitized open-source copy of the project.")
+    parser.add_argument("destination", help="Target directory for the public copy")
+    args = parser.parse_args()
+
+    src = Path.cwd()
+    dst = Path(args.destination).expanduser().resolve()
+    try:
+        export_open_source(src, dst)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     print(f"Exported sanitized copy to: {dst}")
     return 0

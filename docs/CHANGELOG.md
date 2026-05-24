@@ -43,11 +43,11 @@ GLM_WORDS_SMTP_TLS=true
 **Commit**: `664aa48`
 
 ### Frontend
-- Add ICP备案号 (鲁ICP备2026015060号-1) to login page and main app footer
+- Add ICP备案号 (ICP备案号) to login page and main app footer
 - Adjust footer layout for better display on mobile
 
 ### Infrastructure
-- Let's Encrypt SSL certificate for moonpulse.online
+- Let's Encrypt SSL certificate for example.com
 - HTTPS with HTTP→HTTPS redirect
 - HSTS enabled (max-age=63072000)
 - Certificate valid until 2026-08-19

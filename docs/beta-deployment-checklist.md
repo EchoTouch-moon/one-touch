@@ -53,7 +53,7 @@ GLM_WORDS_SMTP_HOST=smtp.example.com
 GLM_WORDS_SMTP_PORT=587
 GLM_WORDS_SMTP_USERNAME=your-smtp-user
 GLM_WORDS_SMTP_PASSWORD=your-smtp-password
-GLM_WORDS_SMTP_FROM=no-reply@moonpulse.online
+GLM_WORDS_SMTP_FROM=no-reply@example.com
 GLM_WORDS_SMTP_TLS=true
 ```
 
