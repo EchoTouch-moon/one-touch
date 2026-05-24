@@ -6,6 +6,7 @@ import api from '../api/client';
 import { addDefinition, deleteDefinition, updateDefinition, updateWord } from '../api/words';
 import { enrichWord, getEnrichErrorMessage } from '../api/enrich';
 import CanvasFullscreen from '../components/CanvasFullscreen';
+import { deleteDraftRecord } from '../components/canvas-pad/draftStore';
 import { useSettingsStore } from '../store/settingsStore';
 
 const POS_OPTIONS = ['n.', 'v.', 'vi.', 'vt.', 'adj.', 'adv.', 'prep.', 'conj.', 'pron.', 'phr.'];
@@ -132,11 +133,13 @@ export default function WordDetailPage() {
   };
 
   const clearDraft = (wordId: number, defId: number | null) => {
+    const key = `glm-words-ink-draft:detail-${wordId}-${defId ?? 'new'}`;
     try {
-      window.localStorage.removeItem(`glm-words-ink-draft:detail-${wordId}-${defId ?? 'new'}`);
+      window.localStorage.removeItem(key);
     } catch {
       // best-effort
     }
+    void deleteDraftRecord(key).catch(() => undefined);
   };
 
   // Typed-definition editor
@@ -553,6 +556,7 @@ export default function WordDetailPage() {
       </div>
 
       <CanvasFullscreen
+        key={`${word.id}-${fullscreenEditId ?? 'new'}-${fullscreenOpen ? 'open' : 'closed'}`}
         open={fullscreenOpen}
         title={fullscreenEditId !== null ? `Edit ${word.text}` : `Write definition for ${word.text}`}
         initialImage={fullscreenInitial.image}
