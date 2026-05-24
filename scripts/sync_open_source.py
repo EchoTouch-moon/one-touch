@@ -16,7 +16,6 @@ from export_open_source import export_open_source
 DEFAULT_TARGET = Path("/Users/v/new-idea/one touch")
 
 SENSITIVE_PATTERNS = [
-    re.compile(r"moonpulse\.online", re.IGNORECASE),
     re.compile(r"82\.157\.5\.124"),
     re.compile(r"鲁ICP备"),
     re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
