@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as authApi from '../api/auth';
-import { bumpAuthSessionEpoch, setCurrentAuthToken } from '../api/authSession';
+import { bumpAuthSessionEpoch, replaceCurrentAuthToken, setCurrentAuthToken } from '../api/authSession';
 
 interface AuthState {
   token: string | null;
@@ -41,7 +41,7 @@ export const useAuthStore = create<AuthState>()(
             loading: false,
             initialized: true,
           });
-          setCurrentAuthToken(res.token);
+          replaceCurrentAuthToken(res.token);
           return true;
         } catch {
           set({ loading: false, error: 'Invalid email or password' });
@@ -144,7 +144,7 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        setCurrentAuthToken(get().token);
+        replaceCurrentAuthToken(get().token);
         set({ loading: true, error: null });
         try {
           const res = await authApi.getAuthStatus();

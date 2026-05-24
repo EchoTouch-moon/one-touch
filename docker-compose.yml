@@ -7,7 +7,7 @@ services:
       - .env
     environment:
       GLM_WORDS_DATABASE_URL: sqlite+aiosqlite:////data/words.db
-      GLM_WORDS_ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,http://127.0.0.1:8080,https://example.com,https://www.example.com
+      GLM_WORDS_ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,http://82.157.5.124:8080,https://moonpulse.online,https://www.moonpulse.online
       GLM_WORDS_BACKUP_DIR: /data/backups
       GLM_WORDS_LOG_DIR: /data/logs
     volumes:

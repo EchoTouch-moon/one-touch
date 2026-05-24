@@ -44,7 +44,10 @@ export interface InviteCodeItem {
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
   const res = await api.post<LoginResponse>('/auth/login', { username, password }, {
-    headers: { 'X-Suppress-Auth-Expired-Toast': '1' },
+    headers: {
+      'X-Skip-Auth': '1',
+      'X-Suppress-Auth-Expired-Toast': '1',
+    },
   });
   return res.data;
 }

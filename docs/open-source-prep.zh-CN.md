@@ -60,6 +60,6 @@ python3 scripts/export_open_source.py /path/to/glm-words-public
 
 ```bash
 cd /path/to/glm-words-public
-rg -n "YOUR_PRIVATE_DOMAIN|YOUR_SERVER_IP|ICP备|DOUBAO_API_KEY|SMTP_PASSWORD|AUTH_SECRET|sk-"
+rg -n "moonpulse|82\\.157|鲁ICP备|DOUBAO_API_KEY|SMTP_PASSWORD|AUTH_SECRET|sk-"
 find . -name "*.db" -o -name "*.log" -o -name "*.jsonl"
 ```

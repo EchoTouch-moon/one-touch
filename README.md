@@ -4,7 +4,7 @@
 
 一触 is a self-hosted vocabulary app built around handwriting-first capture, SM-2 review, offline-friendly workflows, and optional LLM enrichment.
 
-Live demo is optional; configure your own self-hosted deployment URL after publishing.
+**Live demo:** [moonpulse.online/settings](https://moonpulse.online/settings)
 
 ## Highlights
 
@@ -19,16 +19,16 @@ Live demo is optional; configure your own self-hosted deployment URL after publi
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/capture-handwriting.jpg" alt="收词手写" /></td>
-    <td width="50%"><img src="docs/screenshots/settings-runtime.png" alt="运行状态" /></td>
+    <td width="50%"><img src="docs/screenshots/capture-handwriting.jpg" alt="Capture with handwriting" /></td>
+    <td width="50%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="Review handwritten card" /></td>
   </tr>
 </table>
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/screenshots/word-detail.jpg" alt="单词详情" /></td>
-    <td width="33%"><img src="docs/screenshots/mobile-review.jpg" alt="移动端复习" /></td>
-    <td width="33%"><img src="docs/screenshots/review-handwritten-card.jpg" alt="复习手写卡" /></td>
+    <td width="33%"><img src="docs/screenshots/word-detail.jpg" alt="Word detail" /></td>
+    <td width="33%"><img src="docs/screenshots/mobile-review.jpg" alt="Mobile review" /></td>
+    <td width="33%"><img src="docs/screenshots/settings-runtime.png" alt="Settings runtime" /></td>
   </tr>
 </table>
 

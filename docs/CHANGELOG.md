@@ -23,11 +23,11 @@ All notable changes to this project will be documented in this file.
 GLM_WORDS_REGISTRATION_ENABLED=true
 GLM_WORDS_REGISTRATION_MAX_USERS=30
 GLM_WORDS_MAIL_PROVIDER=smtp
-GLM_WORDS_SMTP_HOST=smtp.example.com
+GLM_WORDS_SMTP_HOST=smtp.qq.com
 GLM_WORDS_SMTP_PORT=587
-GLM_WORDS_SMTP_USERNAME=your-smtp-user
-GLM_WORDS_SMTP_PASSWORD=your-smtp-password
-GLM_WORDS_SMTP_FROM=no-reply@example.com
+GLM_WORDS_SMTP_USERNAME=your@email.com
+GLM_WORDS_SMTP_PASSWORD=授权码
+GLM_WORDS_SMTP_FROM=your@email.com
 GLM_WORDS_SMTP_TLS=true
 ```
 
@@ -43,14 +43,14 @@ GLM_WORDS_SMTP_TLS=true
 **Commit**: `664aa48`
 
 ### Frontend
-- Add ICP备案号 (ICP备案号) to login page and main app footer
+- Add ICP备案号 (鲁ICP备2026015060号-1) to login page and main app footer
 - Adjust footer layout for better display on mobile
 
 ### Infrastructure
-- Let's Encrypt SSL certificate for example.com
+- Let's Encrypt SSL certificate for moonpulse.online
 - HTTPS with HTTP→HTTPS redirect
 - HSTS enabled (max-age=63072000)
-- Certificate renewal should be handled by the deployment environment
+- Certificate valid until 2026-08-19
 
 ### Files
 - `frontend/src/App.tsx`, `frontend/src/components/AuthGate.tsx`, `frontend/src/index.css`

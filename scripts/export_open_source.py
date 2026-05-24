@@ -48,8 +48,8 @@ SKIP_PATTERNS = [
 ]
 
 TEXT_REWRITES = [
-    (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"), "127.0.0.1"),
-    (re.compile(r"[\u4e00-\u9fa5]?ICP备[\d号\-]+"), "ICP备案号"),
+    (re.compile(r"82\.157\.5\.124"), "127.0.0.1"),
+    (re.compile(r"鲁ICP备[\d号\-]+"), "ICP备案号"),
 ]
 
 TEXT_EXTS = {
@@ -68,7 +68,8 @@ def should_skip(path: Path) -> bool:
 
 
 def rewrite_text(content: str, rel: Path) -> str:
-    del rel
+    if rel.as_posix() not in {"README.md", "README.zh-CN.md"}:
+        content = re.sub(r"moonpulse\.online", "example.com", content, flags=re.IGNORECASE)
     for pattern, replacement in TEXT_REWRITES:
         content = pattern.sub(replacement, content)
     return content
