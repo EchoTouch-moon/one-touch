@@ -5,6 +5,7 @@ export const MAX_EXPORT_EDGE = 1600;
 export const PREVIEW_MIME = 'image/webp';
 export const PREVIEW_QUALITY = 0.82;
 export const PREVIEW_DEBOUNCE_MS = 250;
+export const PREVIEW_AFTER_STROKE_DELAY_MS = 500;
 export const PEN_WIDTH = 1.0;
 export const ERASER_WIDTH = 28;
 export const ERASER_RADIUS = ERASER_WIDTH / 2;
@@ -21,6 +22,9 @@ export const NO_PRESSURE_BASE = 0.15;
 export const NO_PRESSURE_SLOW_GAIN = 0.4;
 export const NO_PRESSURE_TILT_GAIN = 0.15;
 export const PRESSURE_TILT_BLEND = 0.1;
+export const WIDTH_SMOOTH_ALPHA = 0.22;
+export const MIN_POINT_DISTANCE = 0.35;
+export const MAX_POINT_JUMP = 120;
 
 export const PEN_WEIGHTS = [0.4, 0.7, 1.0] as const;
 export const PEN_WEIGHT_LABELS = ['fine', 'standard', 'bold'] as const;

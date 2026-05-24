@@ -7,12 +7,15 @@ import {
   ERASER_WIDTH,
   INITIAL_VIEWPORT,
   MAX_EXPORT_EDGE,
+  MAX_POINT_JUMP,
+  MIN_POINT_DISTANCE,
   PAPER_GUIDE_KEY,
   PAPER_GUIDE_OPTIONS,
   PAPER_HEIGHT,
   PAPER_WIDTH,
   PEN_WEIGHT_STORAGE_KEY,
   PEN_WIDTH,
+  PREVIEW_AFTER_STROKE_DELAY_MS,
   PREVIEW_DEBOUNCE_MS,
 } from './constants';
 import { deleteDraftRecord, readDraftRecord, writeDraftRecord } from './draftStore';
@@ -37,6 +40,10 @@ import {
   paintStrokeTail,
 } from './strokeRenderer';
 import type {
+  CanvasPadExperimentKind,
+  CanvasPadMetricSample,
+} from './metrics';
+import type {
   DocSize,
   DrawingTool,
   HistoryAction,
@@ -57,6 +64,8 @@ interface UseCanvasPadControllerOptions {
   draftKey?: string | null;
   penOnly?: boolean;
   rebuildPreviewOnLoad?: boolean;
+  experimentKind?: CanvasPadExperimentKind;
+  onMetric?: (sample: CanvasPadMetricSample) => void;
 }
 
 export function useCanvasPadController({
@@ -68,6 +77,8 @@ export function useCanvasPadController({
   draftKey = null,
   penOnly = true,
   rebuildPreviewOnLoad = false,
+  experimentKind = 'baseline',
+  onMetric,
 }: UseCanvasPadControllerOptions) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
@@ -82,9 +93,12 @@ export function useCanvasPadController({
   const removedDuringErase = useRef<RemovedStroke[]>([]);
   const eraseStartIndex = useRef<Map<string, number>>(new Map());
   const previewTimerRef = useRef<number | null>(null);
+  const pointFlushFrameRef = useRef<number | null>(null);
+  const queuedEventsRef = useRef<PointerEvent[]>([]);
   const commitSeqRef = useRef(0);
   const onChangeRef = useRef(onChange);
   const onInkChangeRef = useRef(onInkChange);
+  const onMetricRef = useRef(onMetric);
 
   const [strokes, setStrokes] = useState<InkStroke[]>([]);
   const [history, setHistory] = useState<HistoryAction[]>([]);
@@ -140,6 +154,18 @@ export function useCanvasPadController({
     onInkChangeRef.current = onInkChange;
   }, [onInkChange]);
 
+  useEffect(() => {
+    onMetricRef.current = onMetric;
+  }, [onMetric]);
+
+  const reportMetric = useCallback((sample: Omit<CanvasPadMetricSample, 'kind' | 'at'>) => {
+    onMetricRef.current?.({
+      ...sample,
+      kind: experimentKind,
+      at: performance.now(),
+    });
+  }, [experimentKind]);
+
   const getContext = useCallback(() => (
     canvasRef.current?.getContext('2d') ?? null
   ), []);
@@ -168,6 +194,7 @@ export function useCanvasPadController({
     backgroundImage: string | null,
     afterRender?: () => void,
   ) => {
+    const renderStartedAt = performance.now();
     const canvas = canvasRef.current;
     const ctx = getContext();
     if (!canvas || !ctx) return;
@@ -229,6 +256,11 @@ export function useCanvasPadController({
       }
       target.restore();
       afterRender?.();
+      reportMetric({
+        event: 'render',
+        frameMs: performance.now() - renderStartedAt,
+        strokeCount: sourceStrokes.length,
+      });
     };
 
     paintBackdrop(ctx, rect);
@@ -258,7 +290,7 @@ export function useCanvasPadController({
 
     applyDocTransform(ctx);
     drawClippedInk(ctx);
-  }, [getContext]);
+  }, [getContext, reportMetric]);
 
   const exportPreview = useCallback(async () => {
     const doc = docSizeRef.current;
@@ -372,9 +404,15 @@ export function useCanvasPadController({
     persistDraft(nextStrokes, latestValue.current, inkData);
 
     const buildPreview = () => {
+      const exportStartedAt = performance.now();
       void exportPreview().then((preview) => {
         if (seq !== commitSeqRef.current) return;
         if (!preview) return;
+        reportMetric({
+          event: 'export',
+          exportMs: performance.now() - exportStartedAt,
+          strokeCount: strokesRef.current.length,
+        });
         latestValue.current = preview;
         onChangeRef.current(preview);
         persistDraft(strokesRef.current, preview, serializeInkData(
@@ -396,7 +434,7 @@ export function useCanvasPadController({
       previewTimerRef.current = null;
       buildPreview();
     }, PREVIEW_DEBOUNCE_MS);
-  }, [exportPreview, getCanvasSize, persistDraft]);
+  }, [exportPreview, getCanvasSize, persistDraft, reportMetric]);
 
   useEffect(() => {
     latestValue.current = value;
@@ -503,7 +541,7 @@ export function useCanvasPadController({
   const getPoint = (
     event: Pick<
       PointerEvent | ReactPointerEvent<HTMLCanvasElement>,
-      'clientX' | 'clientY' | 'pressure' | 'tiltX' | 'tiltY' | 'twist'
+      'clientX' | 'clientY' | 'pressure' | 'tiltX' | 'tiltY' | 'twist' | 'timeStamp'
     >,
   ): Point | null => {
     const canvas = canvasRef.current;
@@ -520,7 +558,26 @@ export function useCanvasPadController({
       tiltX: Number.isFinite(event.tiltX) ? event.tiltX : 0,
       tiltY: Number.isFinite(event.tiltY) ? event.tiltY : 0,
       twist: Number.isFinite(event.twist) ? event.twist : 0,
-      t: Date.now(),
+      t: Number.isFinite(event.timeStamp) ? event.timeStamp : performance.now(),
+    };
+  };
+
+  const shouldAcceptPoint = (stroke: InkStroke, point: Point) => {
+    const prev = stroke.points.at(-1);
+    if (!prev) return true;
+    const dist = Math.hypot(point.x - prev.x, point.y - prev.y);
+    if (dist < MIN_POINT_DISTANCE) return false;
+    return dist <= MAX_POINT_JUMP;
+  };
+
+  const smoothPoint = (stroke: InkStroke, point: Point): Point => {
+    const prev = stroke.points.at(-1);
+    const prev2 = stroke.points.at(-2);
+    if (!prev || !prev2 || stroke.points.length > 4) return point;
+    return {
+      ...point,
+      x: point.x * 0.65 + prev.x * 0.25 + prev2.x * 0.1,
+      y: point.y * 0.65 + prev.y * 0.25 + prev2.y * 0.1,
     };
   };
 
@@ -561,6 +618,57 @@ export function useCanvasPadController({
     renderStrokes(nextStrokes, backgroundImageRef.current);
   }, [renderStrokes, setCommittedStrokes]);
 
+  const processQueuedPoints = useCallback(() => {
+    pointFlushFrameRef.current = null;
+    const startedAt = performance.now();
+    const events = queuedEventsRef.current;
+    queuedEventsRef.current = [];
+    const stroke = currentStroke.current;
+    if (!drawing.current || !stroke || events.length === 0) return;
+
+    const ctx = getContext();
+    if (!ctx) return;
+
+    const doc = docSizeRef.current;
+    if (doc) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, doc.width, doc.height);
+      ctx.clip();
+    }
+
+    let accepted = 0;
+    for (const item of events) {
+      const rawPoint = getPoint(item);
+      if (!rawPoint) continue;
+      if (doc && (rawPoint.x < 0 || rawPoint.y < 0 || rawPoint.x > doc.width || rawPoint.y > doc.height)) continue;
+      if (!shouldAcceptPoint(stroke, rawPoint)) continue;
+      const point = stroke.tool === 'eraser' ? rawPoint : smoothPoint(stroke, rawPoint);
+      stroke.points.push(point);
+      stroke.bounds = stroke.bounds ? includePoint(stroke.bounds, point) : emptyBounds(point);
+      accepted += 1;
+      if (stroke.tool === 'eraser') {
+        eraseAtPoint(point);
+        continue;
+      }
+      paintSegmentAt(ctx, stroke, stroke.points.length - 1);
+    }
+    if (doc) {
+      ctx.restore();
+    }
+    reportMetric({
+      event: 'render',
+      frameMs: performance.now() - startedAt,
+      queuedPoints: accepted,
+      strokePoints: stroke.points.length,
+    });
+  }, [eraseAtPoint, getContext, reportMetric]);
+
+  const schedulePointFlush = useCallback(() => {
+    if (pointFlushFrameRef.current !== null) return;
+    pointFlushFrameRef.current = window.requestAnimationFrame(processQueuedPoints);
+  }, [processQueuedPoints]);
+
   const enterGesture = useCallback(() => {
     if (drawing.current && currentStroke.current && activePointerId.current !== null) {
       const canvas = canvasRef.current;
@@ -577,6 +685,11 @@ export function useCanvasPadController({
     activePointerId.current = null;
     activePointerType.current = '';
     removedDuringErase.current = [];
+    queuedEventsRef.current = [];
+    if (pointFlushFrameRef.current !== null) {
+      window.cancelAnimationFrame(pointFlushFrameRef.current);
+      pointFlushFrameRef.current = null;
+    }
     gestureRef.current.active = true;
     renderStrokes(strokesRef.current, backgroundImageRef.current);
     setInputLabel('Pinch to zoom');
@@ -655,6 +768,13 @@ export function useCanvasPadController({
       bounds: emptyBounds(point),
     };
 
+    reportMetric({
+      event: 'pointerdown',
+      pointerType: event.pointerType,
+      strokePoints: 1,
+      strokeCount: strokesRef.current.length,
+    });
+
     canvas.setPointerCapture(event.pointerId);
     activePointerId.current = event.pointerId;
     activePointerType.current = event.pointerType;
@@ -706,33 +826,21 @@ export function useCanvasPadController({
     if (!drawing.current || !stroke || activePointerId.current !== event.pointerId) return;
     if (!canDrawWithPointer(event)) return;
 
-    const ctx = getContext();
-    if (!ctx) return;
     const native = event.nativeEvent;
     const events = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : [native];
+    const predictedCount = typeof native.getPredictedEvents === 'function'
+      ? native.getPredictedEvents().length
+      : 0;
 
-    const doc = docSizeRef.current;
-    if (doc) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, doc.width, doc.height);
-      ctx.clip();
-    }
-    for (const item of events) {
-      const point = getPoint(item);
-      if (!point) continue;
-      if (doc && (point.x < 0 || point.y < 0 || point.x > doc.width || point.y > doc.height)) continue;
-      stroke.points.push(point);
-      stroke.bounds = stroke.bounds ? includePoint(stroke.bounds, point) : emptyBounds(point);
-      if (stroke.tool === 'eraser') {
-        eraseAtPoint(point);
-        continue;
-      }
-      paintSegmentAt(ctx, stroke, stroke.points.length - 1);
-    }
-    if (doc) {
-      ctx.restore();
-    }
+    reportMetric({
+      event: 'pointermove',
+      pointerType: event.pointerType,
+      coalescedCount: events.length,
+      predictedCount,
+      queuedPoints: events.length,
+    });
+    queuedEventsRef.current.push(...events);
+    schedulePointFlush();
   };
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -751,20 +859,32 @@ export function useCanvasPadController({
     if (activePointerId.current !== event.pointerId) return;
 
     const stroke = currentStroke.current;
+    if (pointFlushFrameRef.current !== null) {
+      window.cancelAnimationFrame(pointFlushFrameRef.current);
+      pointFlushFrameRef.current = null;
+    }
+    processQueuedPoints();
     drawing.current = false;
     activePointerId.current = null;
     currentStroke.current = null;
+    queuedEventsRef.current = [];
     setInputLabel(activePointerType.current === 'pen' ? 'Stylus ready' : 'Ready');
     activePointerType.current = '';
 
     if (!stroke) return;
+    reportMetric({
+      event: 'pointerup',
+      pointerType: event.pointerType,
+      strokePoints: stroke.points.length,
+      strokeCount: strokesRef.current.length,
+    });
     if (stroke.tool === 'eraser') {
       const removed = removedDuringErase.current;
       removedDuringErase.current = [];
       eraseStartIndex.current = new Map();
       if (removed.length > 0) {
         pushHistory({ type: 'remove', removed });
-        window.requestAnimationFrame(() => commit(strokesRef.current));
+        window.setTimeout(() => commit(strokesRef.current), PREVIEW_AFTER_STROKE_DELAY_MS);
       }
       return;
     }
@@ -785,7 +905,7 @@ export function useCanvasPadController({
     stroke.bounds = computeStrokeBounds(stroke);
     setCommittedStrokes(nextStrokes);
     pushHistory({ type: 'add', stroke });
-    window.requestAnimationFrame(() => commit(nextStrokes));
+    window.setTimeout(() => commit(nextStrokes), PREVIEW_AFTER_STROKE_DELAY_MS);
   };
 
   const handleUndo = () => {

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { PEN_WEIGHT_LABELS, PEN_WEIGHTS } from './canvas-pad/constants';
+import type { CanvasPadExperimentKind, CanvasPadMetricSample } from './canvas-pad/metrics';
 import { useCanvasPadController } from './canvas-pad/useCanvasPadController';
 
 interface CanvasPadProps {
@@ -15,6 +16,8 @@ interface CanvasPadProps {
   draftKey?: string | null;
   penOnly?: boolean;
   rebuildPreviewOnLoad?: boolean;
+  experimentKind?: CanvasPadExperimentKind;
+  onMetric?: (sample: CanvasPadMetricSample) => void;
 }
 
 export default function CanvasPad({
@@ -29,6 +32,8 @@ export default function CanvasPad({
   draftKey = null,
   penOnly = true,
   rebuildPreviewOnLoad = false,
+  experimentKind = 'baseline',
+  onMetric,
 }: CanvasPadProps) {
   const {
     acceptTouch,
@@ -61,6 +66,8 @@ export default function CanvasPad({
     penOnly,
     rebuildPreviewOnLoad,
     resetKey,
+    experimentKind,
+    onMetric,
   });
 
   const heightClass = useMemo(

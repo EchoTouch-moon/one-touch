@@ -10,6 +10,7 @@ import {
   PRESSURE_REFERENCE,
   PRESSURE_SMOOTH_WINDOW,
   PRESSURE_TILT_BLEND,
+  WIDTH_SMOOTH_ALPHA,
   TILT_REF_DEG,
   VELOCITY_MAX,
   VELOCITY_MAX_DECAY,
@@ -36,7 +37,7 @@ function smoothedPressureAt(points: Point[], idx: number, window: number = PRESS
   return count > 0 ? sum / count : 0;
 }
 
-function computePenWidthAt(stroke: InkStroke, idx: number) {
+function computePenWidthTargetAt(stroke: InkStroke, idx: number) {
   if (stroke.tool === 'eraser') return stroke.width;
   const points = stroke.points;
   if (idx < 1 || idx >= points.length) return stroke.width;
@@ -75,6 +76,12 @@ function computePenWidthAt(stroke: InkStroke, idx: number) {
 
   const weight = stroke.weight ?? 1;
   return (stroke.width + intensity * PRESSURE_GAIN * velocityFactor) * weight;
+}
+
+function computePenWidthAt(stroke: InkStroke, idx: number) {
+  const target = computePenWidthTargetAt(stroke, idx);
+  const prevWidth = idx > 1 ? computePenWidthTargetAt(stroke, idx - 1) : target;
+  return prevWidth + (target - prevWidth) * WIDTH_SMOOTH_ALPHA;
 }
 
 function applyStrokeStyle(ctx: CanvasRenderingContext2D, stroke: InkStroke, width: number) {

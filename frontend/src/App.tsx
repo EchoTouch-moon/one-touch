@@ -14,6 +14,7 @@ const ReviewPage = lazy(() => import('./pages/ReviewPage'));
 const WordListPage = lazy(() => import('./pages/WordListPage'));
 const WordDetailPage = lazy(() => import('./pages/WordDetailPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const HandwritingLabPage = lazy(() => import('./pages/HandwritingLabPage'));
 
 const navItems = [
   { to: '/capture', label: 'Capture' },
@@ -188,6 +189,7 @@ function AppShell() {
                 <Route path="/words" element={<WordListPage />} />
                 <Route path="/words/:id" element={<WordDetailPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/handwriting-lab" element={<HandwritingLabPage />} />
               </Routes>
             </Suspense>
           </main>
