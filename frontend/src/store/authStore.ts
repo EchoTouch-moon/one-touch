@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as authApi from '../api/auth';
-import { bumpAuthSessionEpoch, replaceCurrentAuthToken, setCurrentAuthToken } from '../api/authSession';
+import {
+  bumpAuthSessionEpoch,
+  getCurrentAuthToken,
+  replaceCurrentAuthToken,
+  setCurrentAuthToken,
+} from '../api/authSession';
 
 interface AuthState {
   token: string | null;
@@ -137,14 +142,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       init: async () => {
-        if (get().initialized) return;
-        if (!get().token) {
+        const token = get().token;
+        if (get().initialized && getCurrentAuthToken() === token) return;
+        if (!token) {
           setCurrentAuthToken(null);
           set({ initialized: true });
           return;
         }
 
-        replaceCurrentAuthToken(get().token);
+        replaceCurrentAuthToken(token);
         set({ loading: true, error: null });
         try {
           const res = await authApi.getAuthStatus();
@@ -165,7 +171,7 @@ export const useAuthStore = create<AuthState>()(
             loading: false,
             initialized: true,
           });
-          setCurrentAuthToken(get().token);
+          setCurrentAuthToken(token);
         } catch {
           set({
             token: null,
@@ -178,7 +184,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
     }),
-    { name: 'glm-words-auth' },
+    {
+      name: 'glm-words-auth',
+      partialize: (state) => ({
+        token: state.token,
+        username: state.username,
+        role: state.role,
+      }),
+    },
   ),
 );
 

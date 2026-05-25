@@ -105,13 +105,13 @@ function RouteLoadingFallback() {
 }
 
 function AppShell() {
-  const { username, token, logout } = useAuthStore();
+  const { username, token, logout, initialized } = useAuthStore();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const startReviewSession = useReviewStore((s) => s.startSession);
   const location = useLocation();
 
   useEffect(() => {
-    if (!token) return;
+    if (!initialized || !token) return;
 
     const warmReview = () => {
       void import('./pages/ReviewPage');
@@ -127,7 +127,7 @@ function AppShell() {
 
     const timer = window.setTimeout(warmReview, 1500);
     return () => window.clearTimeout(timer);
-  }, [startReviewSession, token]);
+  }, [initialized, startReviewSession, token]);
 
   return (
     <AuthGate>
