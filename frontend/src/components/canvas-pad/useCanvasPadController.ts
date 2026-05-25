@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import {
   BACKGROUND,
@@ -54,6 +54,19 @@ import type {
   RemovedStroke,
   Viewport,
 } from './types';
+
+type PenButtonEvent = Pick<
+  PointerEvent | ReactPointerEvent<HTMLCanvasElement>,
+  'pointerType' | 'button' | 'buttons'
+>;
+
+function hasPenBarrelButton(event: PenButtonEvent) {
+  return event.pointerType === 'pen' && (event.button === 2 || (event.buttons & 2) === 2);
+}
+
+function hasPenEraserButton(event: PenButtonEvent) {
+  return event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
+}
 
 interface UseCanvasPadControllerOptions {
   value: string | null;
@@ -587,14 +600,14 @@ export function useCanvasPadController({
   };
 
   const eventTool = (event: ReactPointerEvent<HTMLCanvasElement> | PointerEvent): DrawingTool => {
-    const buttons = event.buttons || 0;
-    const button = event.button;
-    const hasBarrelButton = button === 2 || (buttons & 2) === 2;
-    const hasEraserButton = button === 5 || (buttons & 32) === 32;
-    if (event.pointerType === 'pen' && (hasBarrelButton || hasEraserButton)) {
+    if (hasPenBarrelButton(event) || hasPenEraserButton(event)) {
       return 'eraser';
     }
     return tool;
+  };
+
+  const handleContextMenu = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
   };
 
   const eraseAtPoint = useCallback((point: Point) => {
@@ -757,6 +770,9 @@ export function useCanvasPadController({
     }
 
     const strokeTool = eventTool(event);
+    if (strokeTool === 'eraser' && event.pointerType === 'pen') {
+      event.preventDefault();
+    }
     const stroke: InkStroke = {
       id: makeId(),
       tool: strokeTool,
@@ -823,8 +839,20 @@ export function useCanvasPadController({
     }
 
     const stroke = currentStroke.current;
+    if (!drawing.current && event.pointerType === 'pen') {
+      if (hasPenBarrelButton(event) || hasPenEraserButton(event)) {
+        event.preventDefault();
+        setInputLabel('Barrel eraser ready');
+      } else if (activePointerType.current === 'pen') {
+        setInputLabel('Stylus ready');
+      }
+      return;
+    }
     if (!drawing.current || !stroke || activePointerId.current !== event.pointerId) return;
     if (!canDrawWithPointer(event)) return;
+    if (stroke.tool === 'eraser' && event.pointerType === 'pen') {
+      event.preventDefault();
+    }
 
     const native = event.nativeEvent;
     const events = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : [native];
@@ -993,6 +1021,7 @@ export function useCanvasPadController({
     cyclePaperGuide,
     handleAddPage,
     handleClear,
+    handleContextMenu,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,

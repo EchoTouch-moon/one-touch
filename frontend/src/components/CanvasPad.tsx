@@ -41,6 +41,7 @@ export default function CanvasPad({
     cyclePaperGuide,
     handleAddPage,
     handleClear,
+    handleContextMenu,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -192,6 +193,7 @@ export default function CanvasPad({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onContextMenu={handleContextMenu}
       />
     </div>
   );
