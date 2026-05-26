@@ -47,7 +47,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-        from backend.models import Word, Definition, ExampleSentence, Collocation, ReviewRecord, User, InviteCode, EmailVerification  # noqa: F401
+        from backend.models import Word, Definition, ExampleSentence, Collocation, ReviewRecord, ReviewLog, User, InviteCode, EmailVerification  # noqa: F401
         from backend.services import user_service
         from backend.services.backup_service import backup_loop, prune_old_backups, run_sqlite_backup
         from backend.passwords import hash_password
@@ -79,12 +79,33 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 await conn.execute(text("ALTER TABLE definitions ADD COLUMN ink_data TEXT"))
                 logger.info("Migrated: added ink_data column to definitions table")
 
+            review_columns = await conn.run_sync(
+                lambda sync_conn: [row[1] for row in sync_conn.execute(text("PRAGMA table_info(review_records)"))]
+            )
+            review_record_migrations = {
+                "algorithm": "ALTER TABLE review_records ADD COLUMN algorithm VARCHAR(32) NOT NULL DEFAULT 'sm2'",
+                "phase": "ALTER TABLE review_records ADD COLUMN phase VARCHAR(32) NOT NULL DEFAULT 'review'",
+                "difficulty": "ALTER TABLE review_records ADD COLUMN difficulty FLOAT",
+                "stability": "ALTER TABLE review_records ADD COLUMN stability FLOAT",
+                "retrievability": "ALTER TABLE review_records ADD COLUMN retrievability FLOAT",
+                "scheduled_days": "ALTER TABLE review_records ADD COLUMN scheduled_days INTEGER",
+                "learning_step": "ALTER TABLE review_records ADD COLUMN learning_step INTEGER NOT NULL DEFAULT 0",
+                "learning_due_at": "ALTER TABLE review_records ADD COLUMN learning_due_at DATETIME",
+            }
+            for column_name, statement in review_record_migrations.items():
+                if "id" in review_columns and column_name not in review_columns:
+                    await conn.execute(text(statement))
+                    logger.info("Migrated: added %s column to review_records table", column_name)
+
             # Production performance indexes for the hot review and word-list paths.
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_words_user_created ON words(user_id, created_at)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_words_user_status ON words(user_id, status)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_definitions_word_id ON definitions(word_id)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_review_records_next_review ON review_records(next_review)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_review_records_learning_due_at ON review_records(learning_due_at)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_review_records_last_review ON review_records(last_review)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_review_logs_word_id ON review_logs(word_id)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_review_logs_reviewed_at ON review_logs(reviewed_at)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_ai_enrich_usage_user_date ON ai_enrich_usage(user_id, usage_date)"))
 
             verification_columns = await conn.run_sync(

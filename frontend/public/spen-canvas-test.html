@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>S Pen Pointer Test</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f4f5;
+      color: #18181b;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 21rem;
+      width: 100%;
+      height: 100%;
+    }
+
+    .pad-wrap {
+      position: relative;
+      min-width: 0;
+      height: 100%;
+      padding: 12px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 1px solid #d4d4d8;
+      border-radius: 10px;
+      background: #fff;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .badge {
+      position: absolute;
+      top: 22px;
+      left: 22px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      border-radius: 999px;
+      background: rgba(24, 24, 27, 0.82);
+      color: #fff;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+
+    .badge.eraser .dot {
+      background: #f97316;
+    }
+
+    aside {
+      height: 100%;
+      overflow: auto;
+      border-left: 1px solid #e4e4e7;
+      background: #fff;
+      padding: 14px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    p {
+      margin: 0;
+      color: #71717a;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    button {
+      height: 32px;
+      border: 1px solid #d4d4d8;
+      border-radius: 7px;
+      background: #fff;
+      color: #3f3f46;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .cell {
+      border: 1px solid #e4e4e7;
+      border-radius: 8px;
+      padding: 8px;
+      min-height: 54px;
+    }
+
+    .label {
+      display: block;
+      color: #a1a1aa;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      display: block;
+      margin-top: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px;
+      color: #18181b;
+      word-break: break-word;
+    }
+
+    .warning {
+      margin: 12px 0;
+      border-left: 3px solid #f97316;
+      background: #fff7ed;
+      padding: 9px 10px;
+      color: #9a3412;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .log {
+      margin-top: 10px;
+      max-height: 38vh;
+      overflow: auto;
+      border: 1px solid #e4e4e7;
+      border-radius: 8px;
+      background: #fafafa;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+    }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 5.6rem 1fr;
+      gap: 6px;
+      border-bottom: 1px solid #ececef;
+      padding: 5px 7px;
+      color: #52525b;
+    }
+
+    .log-row:last-child {
+      border-bottom: 0;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) 18rem;
+      }
+
+      aside {
+        border-left: 0;
+        border-top: 1px solid #e4e4e7;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="pad-wrap">
+      <canvas id="pad"></canvas>
+      <div id="badge" class="badge"><span class="dot"></span><span id="modeText">Pen ready</span></div>
+    </section>
+    <aside>
+      <h1>S Pen Pointer Test</h1>
+      <p>Use this page directly on tablet Chrome. Hold the S Pen side button near the screen or while touching the canvas.</p>
+
+      <div class="controls">
+        <button id="clearBtn" type="button">Clear</button>
+        <button id="downloadBtn" type="button">Download log</button>
+      </div>
+
+      <div class="grid">
+        <div class="cell"><span class="label">pointerType</span><span id="pointerType" class="value">-</span></div>
+        <div class="cell"><span class="label">event</span><span id="eventType" class="value">-</span></div>
+        <div class="cell"><span class="label">button</span><span id="button" class="value">-</span></div>
+        <div class="cell"><span class="label">buttons</span><span id="buttons" class="value">-</span></div>
+        <div class="cell"><span class="label">pressure</span><span id="pressure" class="value">-</span></div>
+        <div class="cell"><span class="label">tilt</span><span id="tilt" class="value">-</span></div>
+        <div class="cell"><span class="label">coalesced</span><span id="coalesced" class="value">-</span></div>
+        <div class="cell"><span class="label">predicted</span><span id="predicted" class="value">-</span></div>
+      </div>
+
+      <div id="diagnosis" class="warning">
+        Expected S Pen side button signal: <strong>pointerType=pen</strong>, <strong>button=2</strong> or <strong>buttons=2</strong>. Some browsers still dispatch contextmenu; it should show as prevented.
+      </div>
+
+      <div class="grid">
+        <div class="cell"><span class="label">barrel hits</span><span id="barrelHits" class="value">0</span></div>
+        <div class="cell"><span class="label">contextmenu</span><span id="contextHits" class="value">0</span></div>
+        <div class="cell"><span class="label">prevented</span><span id="preventedHits" class="value">0</span></div>
+      </div>
+
+      <div id="log" class="log"></div>
+    </aside>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('pad');
+    const ctx = canvas.getContext('2d', { desynchronized: true }) || canvas.getContext('2d');
+    const badge = document.getElementById('badge');
+    const modeText = document.getElementById('modeText');
+    const logEl = document.getElementById('log');
+    const fields = {
+      pointerType: document.getElementById('pointerType'),
+      eventType: document.getElementById('eventType'),
+      button: document.getElementById('button'),
+      buttons: document.getElementById('buttons'),
+      pressure: document.getElementById('pressure'),
+      tilt: document.getElementById('tilt'),
+      coalesced: document.getElementById('coalesced'),
+      predicted: document.getElementById('predicted'),
+      barrelHits: document.getElementById('barrelHits'),
+      contextHits: document.getElementById('contextHits'),
+      preventedHits: document.getElementById('preventedHits'),
+    };
+
+    let drawing = false;
+    let activePointerId = null;
+    let last = null;
+    let barrelHits = 0;
+    let contextHits = 0;
+    let preventedHits = 0;
+    const samples = [];
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(rect.width * ratio));
+      canvas.height = Math.max(1, Math.round(rect.height * ratio));
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, rect.width, rect.height);
+    }
+
+    function localPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+    }
+
+    function isBarrel(event) {
+      return event.pointerType === 'pen' && (event.button === 2 || (event.buttons & 2) === 2);
+    }
+
+    function isEraser(event) {
+      return event.pointerType === 'pen' && (event.button === 5 || (event.buttons & 32) === 32);
+    }
+
+    function activeMode(event) {
+      return isBarrel(event) || isEraser(event) ? 'eraser' : 'pen';
+    }
+
+    function setMode(mode, note) {
+      badge.classList.toggle('eraser', mode === 'eraser');
+      modeText.textContent = mode === 'eraser'
+        ? (note || 'Barrel eraser')
+        : (note || 'Pen ready');
+      canvas.style.cursor = mode === 'eraser' ? 'cell' : 'crosshair';
+    }
+
+    function drawTo(point, mode, event) {
+      if (!last) {
+        last = point;
+        return;
+      }
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = mode === 'eraser' ? 28 : Math.max(1.2, 1.4 + (event.pressure || 0.5) * 3);
+      ctx.globalCompositeOperation = mode === 'eraser' ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = '#111827';
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+      last = point;
+    }
+
+    function updatePanel(event, typeOverride) {
+      const coalesced = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents().length : 0;
+      const predicted = typeof event.getPredictedEvents === 'function' ? event.getPredictedEvents().length : 0;
+      const barrel = isBarrel(event);
+      if (barrel) barrelHits += 1;
+
+      fields.pointerType.textContent = event.pointerType || '-';
+      fields.eventType.textContent = typeOverride || event.type;
+      fields.button.textContent = String(event.button);
+      fields.buttons.textContent = `${event.buttons} / 0b${event.buttons.toString(2).padStart(6, '0')}`;
+      fields.pressure.textContent = Number(event.pressure).toFixed(3);
+      fields.tilt.textContent = `${event.tiltX || 0}, ${event.tiltY || 0}`;
+      fields.coalesced.textContent = String(coalesced);
+      fields.predicted.textContent = String(predicted);
+      fields.barrelHits.textContent = String(barrelHits);
+      fields.preventedHits.textContent = String(preventedHits);
+
+      const sample = {
+        at: Math.round(performance.now()),
+        type: typeOverride || event.type,
+        pointerType: event.pointerType,
+        button: event.button,
+        buttons: event.buttons,
+        pressure: event.pressure,
+        tiltX: event.tiltX,
+        tiltY: event.tiltY,
+        width: event.width,
+        height: event.height,
+        isPrimary: event.isPrimary,
+        defaultPrevented: event.defaultPrevented,
+        coalesced,
+        predicted,
+        barrel,
+        eraser: isEraser(event),
+      };
+      samples.push(sample);
+      if (samples.length > 500) samples.shift();
+
+      const row = document.createElement('div');
+      row.className = 'log-row';
+      row.innerHTML = `<span>${sample.at} ${sample.type}</span><span>${sample.pointerType} button=${sample.button} buttons=${sample.buttons} pressure=${Number(sample.pressure).toFixed(2)} barrel=${sample.barrel} prevented=${sample.defaultPrevented}</span>`;
+      logEl.prepend(row);
+      while (logEl.children.length > 80) logEl.lastElementChild.remove();
+    }
+
+    function handlePointerDown(event) {
+      if (event.pointerType === 'pen' && (isBarrel(event) || isEraser(event))) {
+        event.preventDefault();
+      }
+      drawing = true;
+      activePointerId = event.pointerId;
+      last = localPoint(event);
+      canvas.setPointerCapture(event.pointerId);
+      const mode = activeMode(event);
+      setMode(mode, mode === 'eraser' ? 'Barrel eraser drawing' : 'Drawing');
+      updatePanel(event);
+    }
+
+    function handlePointerMove(event) {
+      const mode = activeMode(event);
+      if (event.pointerType === 'pen' && mode === 'eraser') {
+        event.preventDefault();
+        setMode('eraser', drawing ? 'Barrel eraser drawing' : 'Barrel eraser hover');
+      } else if (!drawing) {
+        setMode('pen', event.pointerType === 'pen' ? 'Pen hover' : 'Pen ready');
+      }
+      updatePanel(event);
+      if (!drawing || activePointerId !== event.pointerId) return;
+
+      const events = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [event];
+      for (const item of events) {
+        drawTo(localPoint(item), mode, item);
+      }
+    }
+
+    function handlePointerUp(event) {
+      updatePanel(event);
+      drawing = false;
+      activePointerId = null;
+      last = null;
+      setMode('pen', event.pointerType === 'pen' ? 'Pen ready' : 'Ready');
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    function handleContextMenu(event) {
+      contextHits += 1;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.defaultPrevented) preventedHits += 1;
+      fields.contextHits.textContent = String(contextHits);
+      fields.preventedHits.textContent = String(preventedHits);
+      updatePanel(event, 'contextmenu');
+    }
+
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    canvas.addEventListener('pointermove', handlePointerMove);
+    canvas.addEventListener('pointerup', handlePointerUp);
+    canvas.addEventListener('pointercancel', handlePointerUp);
+    canvas.addEventListener('pointerleave', handlePointerUp);
+    canvas.addEventListener('contextmenu', handleContextMenu, { capture: true, passive: false });
+    if ('onpointerrawupdate' in window) {
+      canvas.addEventListener('pointerrawupdate', (event) => updatePanel(event, 'pointerrawupdate'));
+    }
+
+    document.getElementById('clearBtn').addEventListener('click', resize);
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(samples, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spen-pointer-log-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>

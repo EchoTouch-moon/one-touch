@@ -551,6 +551,24 @@ export function useCanvasPadController({
     return () => window.removeEventListener('resize', handleResize);
   }, [renderStrokes]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+
+    const suppressCanvasContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    canvas.addEventListener('contextmenu', suppressCanvasContextMenu, {
+      capture: true,
+      passive: false,
+    });
+    return () => {
+      canvas.removeEventListener('contextmenu', suppressCanvasContextMenu, true);
+    };
+  }, []);
+
   const getPoint = (
     event: Pick<
       PointerEvent | ReactPointerEvent<HTMLCanvasElement>,

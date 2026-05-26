@@ -136,6 +136,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     const { queue, queuePos } = get();
     const card = queue[queuePos];
     if (!card) return;
+    const reviewedAt = new Date().toISOString();
 
     const newReviewed = get().reviewedInGroup + 1;
     const nextPos = queuePos + 1;
@@ -155,12 +156,12 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     }
 
     try {
-      await reviewApi.submitReview({ word_id: card.word_id, quality });
+      await reviewApi.submitReview({ word_id: card.word_id, quality, reviewed_at: reviewedAt });
       removeCardFromCachedReviewSession(card.word_id);
       set({ pendingReviews: getPendingReviews().length, offline: false });
     } catch (error) {
       if (shouldQueueReview(error)) {
-        enqueueReview({ word_id: card.word_id, quality });
+        enqueueReview({ word_id: card.word_id, quality, reviewed_at: reviewedAt });
         set({ pendingReviews: getPendingReviews().length, offline: true });
       }
     }

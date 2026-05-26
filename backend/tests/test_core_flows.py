@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from backend.auth import create_auth_token
@@ -13,7 +15,7 @@ from backend.database import Base
 from backend.llm import LLMConfig, LLMFactory
 from backend.llm.base import EnrichResult
 from backend.llm.doubao_provider import DoubaoProvider, _strip_json_markdown
-from backend.models import User
+from backend.models import ReviewLog, ReviewRecord, User
 from backend.routers import auth as auth_router
 from backend.routers import ops as ops_router
 from backend.services import enrich_quota_service, enrich_service, review_service, sync_service, user_service, word_service
@@ -113,11 +115,144 @@ async def test_review_session_and_submit(test_env):
         record = await review_service.submit_review(db, word.id, 4, user_id=1, role="admin")
         await db.commit()
         assert record.word_id == word.id
-        assert record.repetitions >= 1
+        assert record.phase == "learning"
+        assert record.learning_due_at is not None
 
     async with session_maker() as db:
         stats = await review_service.get_review_stats(db, user_id=1, role="admin")
         assert stats["due_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_review_learning_and_relearning_steps(test_env):
+    async with test_env["session_maker"]() as db:
+        word = await word_service.create_word(db, "steps", user_id=1)
+        await word_service.add_definition(db, word.id, "n.", "steps note", "步骤")
+        await db.commit()
+
+    reviewed_at = datetime(2026, 5, 26, 8, 0, tzinfo=UTC)
+    async with test_env["session_maker"]() as db:
+        record = await review_service.submit_review(
+            db,
+            word.id,
+            1,
+            user_id=1,
+            role="admin",
+            reviewed_at=reviewed_at,
+        )
+        await db.commit()
+        assert record.phase == "learning"
+        assert record.learning_due_at == (reviewed_at + timedelta(minutes=1)).replace(tzinfo=None)
+
+    async with test_env["session_maker"]() as db:
+        record = await db.scalar(select(ReviewRecord).where(ReviewRecord.word_id == word.id))
+        assert record is not None
+        record.learning_step = 3
+        record.learning_due_at = reviewed_at
+        await db.commit()
+
+    async with test_env["session_maker"]() as db:
+        record = await review_service.submit_review(
+            db,
+            word.id,
+            4,
+            user_id=1,
+            role="admin",
+            reviewed_at=reviewed_at + timedelta(minutes=20),
+        )
+        await db.commit()
+        assert record.phase == "review"
+        assert record.learning_due_at is None
+        assert record.next_review.hour == 20
+        assert record.repetitions >= 1
+
+
+@pytest.mark.asyncio
+async def test_due_words_prioritize_review_over_new(test_env):
+    now = datetime(2026, 5, 26, 8, 0, tzinfo=UTC)
+    async with test_env["session_maker"]() as db:
+        overdue = await word_service.create_word(db, "overdue", user_id=1)
+        await word_service.add_definition(db, overdue.id, "n.", "overdue note", "过期")
+        fresh = await word_service.create_word(db, "fresh", user_id=1)
+        await word_service.add_definition(db, fresh.id, "n.", "fresh note", "新词")
+        db.add(
+            ReviewRecord(
+                word_id=overdue.id,
+                phase="review",
+                next_review=now - timedelta(days=3),
+                last_review=now - timedelta(days=10),
+            )
+        )
+        await db.commit()
+
+    async with test_env["session_maker"]() as db:
+        words = await review_service.get_due_words(db, user_id=1, role="admin")
+        assert [word.text for word in words][:2] == ["overdue", "fresh"]
+
+
+@pytest.mark.asyncio
+async def test_review_day_cutoff_uses_4am_local_boundary(test_env):
+    reviewed_at = datetime(2026, 5, 25, 15, 0, tzinfo=UTC)
+    cutoff_probe = datetime(2026, 5, 26, 4, 0, tzinfo=UTC)
+    async with test_env["session_maker"]() as db:
+        word = await word_service.create_word(db, "boundary", user_id=1)
+        await word_service.add_definition(db, word.id, "n.", "boundary note", "边界")
+        db.add(
+            ReviewRecord(
+                word_id=word.id,
+                phase="review",
+                interval_days=1,
+                next_review=review_service._next_review_at(
+                    reviewed_at,
+                    1,
+                    test_env["config"].review,
+                ),
+            )
+        )
+        await db.commit()
+
+    assert review_service.review_day_cutoff(cutoff_probe, test_env["config"].review) >= datetime(
+        2026, 5, 26, 20, 0, tzinfo=UTC
+    )
+    async with test_env["session_maker"]() as db:
+        words = await review_service.get_due_words(
+            db,
+            user_id=1,
+            role="admin",
+            config=test_env["config"].review,
+        )
+        assert [word.text for word in words] == ["boundary"]
+
+
+@pytest.mark.asyncio
+async def test_sync_round_trips_new_review_fields(test_env):
+    async with test_env["session_maker"]() as db:
+        word = await word_service.create_word(db, "fsrs", user_id=1)
+        await word_service.add_definition(db, word.id, "n.", "fsrs note", "调度")
+        db.add(
+            ReviewRecord(
+                word_id=word.id,
+                algorithm="fsrs",
+                phase="review",
+                difficulty=4.5,
+                stability=2.0,
+                retrievability=0.91,
+                scheduled_days=3,
+                learning_step=0,
+                next_review=datetime(2026, 5, 29, 20, 0, tzinfo=UTC),
+            )
+        )
+        await db.commit()
+
+    async with test_env["session_maker"]() as db:
+        data = await sync_service.export_all(db, user_id=1, role="admin")
+        rr = data["words"][0]["review_record"]
+        assert rr["algorithm"] == "fsrs"
+        assert rr["difficulty"] == 4.5
+
+    async with test_env["session_maker"]() as db:
+        logs = list((await db.execute(select(ReviewLog))).scalars().all())
+        assert logs == []
 
 
 @pytest.mark.asyncio

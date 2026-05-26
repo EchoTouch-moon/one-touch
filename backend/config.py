@@ -25,9 +25,12 @@ class LLMProviderConfig:
 
 @dataclass(frozen=True)
 class ReviewConfig:
-    algorithm: str = "sm2"
+    algorithm: str = os.getenv("GLM_WORDS_REVIEW_ALGORITHM", "sm2")
     new_cards_per_day: int = 20
     max_review_per_day: int = 100
+    timezone: str = os.getenv("GLM_WORDS_REVIEW_TIMEZONE", "Asia/Shanghai")
+    day_boundary_hour: int = int(os.getenv("GLM_WORDS_REVIEW_DAY_BOUNDARY_HOUR", "4"))
+    target_retrievability: float = float(os.getenv("GLM_WORDS_TARGET_RETRIEVABILITY", "0.9"))
 
 
 @dataclass(frozen=True)

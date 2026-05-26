@@ -29,6 +29,14 @@ class SyncReviewRecord(BaseModel):
     ease_factor: float = Field(2.5, ge=1.3, le=5.0)
     interval_days: int = Field(0, ge=0, le=36500)
     repetitions: int = Field(0, ge=0, le=10000)
+    algorithm: str = Field("sm2", max_length=32)
+    phase: str = Field("review", max_length=32)
+    difficulty: float | None = Field(None, ge=1.0, le=10.0)
+    stability: float | None = Field(None, ge=0.0)
+    retrievability: float | None = Field(None, ge=0.0, le=1.0)
+    scheduled_days: int | None = Field(None, ge=0, le=36500)
+    learning_step: int = Field(0, ge=0, le=100)
+    learning_due_at: datetime | None = None
     next_review: datetime | None = None
     last_review: datetime | None = None
     last_quality: int | None = Field(None, ge=0, le=5)

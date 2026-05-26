@@ -7,6 +7,14 @@ export interface ReviewCard {
   interval_days: number;
   repetitions: number;
   next_review: string;
+  algorithm: string;
+  phase: string;
+  difficulty: number | null;
+  stability: number | null;
+  retrievability: number | null;
+  scheduled_days: number | null;
+  learning_step: number;
+  learning_due_at: string | null;
 }
 
 export interface ReviewStats {
@@ -24,4 +32,5 @@ export interface ReviewSession {
 export interface ReviewSubmit {
   word_id: number;
   quality: number;
+  reviewed_at?: string;
 }

@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from backend.models.collocation import Collocation
 from backend.models.definition import Definition
 from backend.models.example import ExampleSentence
-from backend.models.review import ReviewRecord
+from backend.models.review import ReviewLog, ReviewRecord
 from backend.models.word import Word
 
 
@@ -46,6 +46,7 @@ async def _delete_scoped_words(
         await session.execute(delete(ExampleSentence).where(ExampleSentence.definition_id.in_(definition_ids)))
         await session.execute(delete(Definition).where(Definition.id.in_(definition_ids)))
 
+    await session.execute(delete(ReviewLog).where(ReviewLog.word_id.in_(word_ids)))
     await session.execute(delete(ReviewRecord).where(ReviewRecord.word_id.in_(word_ids)))
     await session.execute(delete(Word).where(Word.id.in_(word_ids)))
     await session.flush()
@@ -121,6 +122,14 @@ async def export_all(
                 "ease_factor": rr.ease_factor,
                 "interval_days": rr.interval_days,
                 "repetitions": rr.repetitions,
+                "algorithm": rr.algorithm,
+                "phase": rr.phase,
+                "difficulty": rr.difficulty,
+                "stability": rr.stability,
+                "retrievability": rr.retrievability,
+                "scheduled_days": rr.scheduled_days,
+                "learning_step": rr.learning_step,
+                "learning_due_at": rr.learning_due_at.isoformat() if rr.learning_due_at else None,
                 "next_review": rr.next_review.isoformat() if rr.next_review else None,
                 "last_review": rr.last_review.isoformat() if rr.last_review else None,
                 "last_quality": rr.last_quality,
@@ -203,12 +212,21 @@ async def import_data(
         if rr_data:
             next_review_str = rr_data.get("next_review")
             last_review_str = rr_data.get("last_review")
+            learning_due_at_str = rr_data.get("learning_due_at")
             session.add(
                 ReviewRecord(
                     word_id=word.id,
                     ease_factor=rr_data.get("ease_factor", 2.5),
                     interval_days=rr_data.get("interval_days", 0),
                     repetitions=rr_data.get("repetitions", 0),
+                    algorithm=rr_data.get("algorithm", "sm2"),
+                    phase=rr_data.get("phase", "review"),
+                    difficulty=rr_data.get("difficulty"),
+                    stability=rr_data.get("stability"),
+                    retrievability=rr_data.get("retrievability"),
+                    scheduled_days=rr_data.get("scheduled_days"),
+                    learning_step=rr_data.get("learning_step", 0),
+                    learning_due_at=datetime.fromisoformat(learning_due_at_str) if learning_due_at_str else None,
                     next_review=datetime.fromisoformat(next_review_str) if next_review_str else datetime.now(UTC),
                     last_review=datetime.fromisoformat(last_review_str) if last_review_str else None,
                     last_quality=rr_data.get("last_quality"),
