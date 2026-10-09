@@ -296,11 +296,21 @@ const OUTLINE = () => {
   return lines.join('\n');
 };
 
+// A signed-in preview account is needed to audit authenticated routes. The
+// credentials come from the environment so they never live in the repository.
+const PREVIEW_USER = process.env.PREVIEW_USER ?? 'designer';
+const PREVIEW_PASSWORD = process.env.PREVIEW_PASSWORD;
+
 const login = async () => {
+  if (!PREVIEW_PASSWORD) {
+    throw new Error(
+      'Set PREVIEW_USER / PREVIEW_PASSWORD to the credentials of a local preview account.',
+    );
+  }
   const res = await fetch(`${API}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'designer', password: 'designpreview123' }),
+    body: JSON.stringify({ username: PREVIEW_USER, password: PREVIEW_PASSWORD }),
   });
   if (!res.ok) throw new Error(`login failed: ${res.status}`);
   return res.json();

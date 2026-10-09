@@ -46,8 +46,9 @@ python3 scripts/design/pixel-review.py shot.png [more.png ...]
 
 - A running app: `pnpm dev` (proxies `/api` to `127.0.0.1:8000`).
 - A signed-in preview account. The script logs in against
-  `PREVIEW_API/api/auth/login`; override with env vars if your fixtures differ:
-  `PREVIEW_BASE`, `PREVIEW_API`, or edit the credentials in the script.
+  `PREVIEW_API/api/auth/login` using `PREVIEW_USER` / `PREVIEW_PASSWORD` from the
+  environment (no credentials are stored in the repo). Override the endpoints with
+  `PREVIEW_BASE` and `PREVIEW_API` if your fixtures differ.
 - `playwright-core` plus a local Chrome (`chromium.launch({ channel: 'chrome' })`),
   or `playwright` with its bundled Chromium if you prefer:
   `pnpm add -D playwright-core` · `python3 -m pip install pillow numpy`.

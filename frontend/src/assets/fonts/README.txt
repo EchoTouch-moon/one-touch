@@ -16,4 +16,5 @@ All three are licensed under the SIL Open Font License, Version 1.1.
   Fraunces       Copyright 2020 The Fraunces Project Authors (https://github.com/undercasetype/Fraunces)
   JetBrains Mono Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
 
-The full OFL 1.1 text is available at https://scripts.sil.org/OFL
+OFL.txt in this directory is the unmodified license text and travels with the
+font files, as the license requires. Do not edit it.

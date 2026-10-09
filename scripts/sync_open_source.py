@@ -13,7 +13,14 @@ from pathlib import Path
 from export_open_source import export_open_source
 
 
-DEFAULT_TARGET = Path("/Users/v/new-idea/one touch")
+# Derived from this file's location instead of hard-coded, so the repository
+# does not contain a machine-specific absolute path (or a user name).
+# /Users/<you>/<private-repo>/scripts/sync_open_source.py -> /Users/<you>/one touch
+# Override with --target or the OPEN_SOURCE_TARGET environment variable.
+DEFAULT_TARGET = Path(
+    os.environ.get("OPEN_SOURCE_TARGET")
+    or Path(__file__).resolve().parents[2] / "one touch"
+)
 
 SENSITIVE_PATTERNS = [
     re.compile(r"82\.157\.5\.124"),

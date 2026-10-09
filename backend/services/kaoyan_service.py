@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -10,18 +11,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models.kaoyan import ExamSentence, KaoyanWord
 from backend.models.word import Word
 
+logger = logging.getLogger(__name__)
+
 
 async def seed_if_empty(session: AsyncSession, data_dir: Path) -> tuple[int, int]:
-    """Import kaoyan lexicon on first run; re-import sentences every start."""
+    """Import kaoyan lexicon on first run; re-import sentences every start.
+
+    The corpus is generated locally by ``scripts/kaoyan/`` and is not shipped
+    with the source (it is derived from exam papers and a third-party
+    dictionary), so an absent corpus is a supported state: the lexicon stays
+    empty and the rest of the app — capture, review, library, sync — keeps
+    working. A file that exists but is malformed still raises, because that is
+    a data error rather than a missing corpus.
+    """
     word_count = (await session.execute(select(func.count()).select_from(KaoyanWord))).scalar() or 0
 
     words_path = data_dir / "kaoyan_words.json"
     sentences_path = data_dir / "exam_sentences.json"
 
+    # A corpus that is simply absent is fine: log once and run with an empty
+    # lexicon. Only malformed-but-present files are treated as an error.
+    missing = [path for path in (words_path, sentences_path) if not path.is_file()]
+    if missing:
+        logger.warning(
+            "Kaoyan corpus not found (%s); the lexicon stays empty. "
+            "Generate it with scripts/kaoyan/ to enable the Kaoyan features.",
+            ", ".join(str(path) for path in missing),
+        )
+        return 0, 0
+
     # Validate both complete payloads before mutating the database.
-    for path in (words_path, sentences_path):
-        if not path.is_file():
-            raise RuntimeError(f"Required kaoyan data file is missing: {path}")
     entries = json.loads(words_path.read_text(encoding="utf-8"))
     sentences = json.loads(sentences_path.read_text(encoding="utf-8"))
     if not isinstance(entries, list) or not entries or not isinstance(sentences, list) or not sentences:

@@ -124,6 +124,12 @@ The admin account from `.env` is created on first start; the Kaoyan corpus in `d
 is seeded into the database at the same time. SQLite lives at `~/.glm-words/words.db` unless
 `GLM_WORDS_DATABASE_URL` says otherwise.
 
+> **About the Kaoyan corpus.** `data/kaoyan/` is generated locally by `scripts/kaoyan/` from
+> exam papers and a third-party dictionary, and is **not distributed with the source** — those
+> inputs cannot be redistributed. Without it the app still starts and every other feature works;
+> the Kaoyan lexicon is simply empty. Public checkouts therefore see an empty lexicon until you
+> build a corpus yourself.
+
 > Outside debug mode the app will not start with the default admin credentials or an
 > `AUTH_SECRET` shorter than 32 characters.
 

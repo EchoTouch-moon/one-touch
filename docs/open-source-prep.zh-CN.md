@@ -66,7 +66,7 @@ find . -name "*.db" -o -name "*.log" -o -name "*.jsonl"
 
 ## 同步到公开仓库
 
-如果公开仓库已经存在，例如本机的 `/Users/v/new-idea/one touch`，可以用同步脚本把私有仓库当前内容导出、脱敏并覆盖到公开仓库工作区：
+如果公开仓库已经存在，例如与私有仓库同级目录下的 `one touch`，可以用同步脚本把私有仓库当前内容导出、脱敏并覆盖到公开仓库工作区：
 
 ```bash
 python3 scripts/sync_open_source.py

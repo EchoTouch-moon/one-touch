@@ -999,8 +999,9 @@ async def test_kaoyan_missing_or_invalid_data_does_not_delete_existing(test_env,
     async with test_env['session_maker']() as db:
         db.add(ExamSentence(year=2024, text='An existing sentence.', words_json='["existing"]'))
         await db.flush()
-        with pytest.raises(RuntimeError, match='missing'):
-            await kaoyan_service.seed_if_empty(db, tmp_path)
+        # An absent corpus is a supported state: seeding is skipped with a
+        # warning and the existing lexicon survives, so the app still starts.
+        assert await kaoyan_service.seed_if_empty(db, tmp_path) == (0, 0)
         (tmp_path / 'kaoyan_words.json').write_text(json.dumps([{'word': 'test', 'translation': '测试'}]))
         (tmp_path / 'exam_sentences.json').write_text(json.dumps([{'year': 2024, 'text': 'Invalid', 'words': 1}]))
         with pytest.raises(ValueError, match='Invalid sentence'):
