@@ -57,6 +57,18 @@ SKIP_PATTERNS = [
 ]
 
 TEXT_REWRITES = [
+    # The private instance's URL must not be advertised in the public copy, and
+    # pointing at a placeholder domain reads like a broken demo link — replace
+    # the whole status line instead. Must run before the domain rewrite below.
+    (
+        re.compile(r"\*\*Live \(private beta\):\*\*.*"),
+        "**Status:** private beta. This repository is the sanitized public copy; "
+        "the production instance is not public.",
+    ),
+    (
+        re.compile(r"\*\*在线体验（内测）：\*\*.*"),
+        "**状态：** 内测中。本仓库是脱敏后的公开副本，线上实例不对外开放。",
+    ),
     (re.compile(r"82\.157\.5\.124"), "127.0.0.1"),
     (re.compile(r"鲁ICP备[\d号\-]+"), "ICP备案号"),
 ]

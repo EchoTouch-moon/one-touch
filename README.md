@@ -9,7 +9,7 @@ and spaced repetition brings that very card back right before you would forget i
 Capture a word, write its meaning on a full canvas, and review your own ink — SM-2 or FSRS.
 It ships as an installable PWA on a small FastAPI + React stack one person can run.
 
-**Live (private beta):** [example.com](https://example.com)
+**Status:** private beta. This repository is the sanitized public copy; the production instance is not public.
 
 ## Screenshots
 
