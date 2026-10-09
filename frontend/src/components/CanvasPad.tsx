@@ -1,7 +1,9 @@
+import { getCurrentUserId } from '../api/authSession';
 import { useMemo } from 'react';
 
 import { PEN_WEIGHT_LABELS, PEN_WEIGHTS } from './canvas-pad/constants';
 import type { CanvasPadExperimentKind, CanvasPadMetricSample } from './canvas-pad/metrics';
+import type { StrokeRendererKind } from './canvas-pad/strokeRenderer';
 import { useCanvasPadController } from './canvas-pad/useCanvasPadController';
 
 interface CanvasPadProps {
@@ -17,6 +19,7 @@ interface CanvasPadProps {
   penOnly?: boolean;
   rebuildPreviewOnLoad?: boolean;
   experimentKind?: CanvasPadExperimentKind;
+  renderer?: StrokeRendererKind;
   onMetric?: (sample: CanvasPadMetricSample) => void;
 }
 
@@ -33,10 +36,12 @@ export default function CanvasPad({
   penOnly = true,
   rebuildPreviewOnLoad = false,
   experimentKind = 'baseline',
+  renderer = 'outline',
   onMetric,
 }: CanvasPadProps) {
   const {
     acceptTouch,
+    baseCanvasRef,
     canvasRef,
     cyclePaperGuide,
     handleAddPage,
@@ -63,11 +68,12 @@ export default function CanvasPad({
     onChange,
     inkValue,
     onInkChange,
-    draftKey,
+    draftKey: draftKey ? `user-${getCurrentUserId()}:${draftKey}` : null,
     penOnly,
     rebuildPreviewOnLoad,
     resetKey,
     experimentKind,
+    renderer,
     onMetric,
   });
 
@@ -76,44 +82,55 @@ export default function CanvasPad({
     [compact, fullHeight],
   );
 
+  // Every tool in the bar is a button from the shared vocabulary, so it inherits
+  // the same press feedback, focus ring and coarse-pointer sizing as the rest of
+  // the app rather than inventing its own.
+  const toolButton = (active: boolean) =>
+    `btn btn-sm ${active ? 'btn-primary' : 'btn-ghost'} !min-w-9 !px-2.5`;
+
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white ${fullHeight ? 'flex h-full min-h-0 flex-col' : ''} ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-400">{inputLabel}</span>
+    <div className={`card overflow-hidden ${fullHeight ? 'flex min-h-0 w-full flex-1 flex-col' : ''} ${className}`}>
+      {/* Ordered by editing frequency: undo/redo → tools → paper → destructive */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-2 py-1.5">
+        <div className="flex items-center gap-1.5">
+          {penOnly ? (
+            <button
+              type="button"
+              onClick={() => setAcceptTouch((enabled) => !enabled)}
+              title={`${inputLabel}. Toggle finger drawing`}
+              className={`btn btn-sm ${acceptTouch ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              {acceptTouch ? 'Finger on' : 'Pen only'}
+            </button>
+          ) : (
+            <span className="px-2 text-micro font-medium text-ink-mute">{inputLabel}</span>
+          )}
           {Math.abs(viewport.zoom - 1) > 0.01 && (
             <button
               type="button"
               onClick={resetViewport}
-              className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-[11px] text-gray-600 transition hover:bg-gray-200"
               title="Reset zoom"
+              className="btn btn-sm btn-ghost num"
             >
               {Math.round(viewport.zoom * 100)}%
             </button>
           )}
         </div>
+
         <div className="flex flex-wrap items-center justify-end gap-1">
-          {penOnly && (
-            <button
-              type="button"
-              onClick={() => setAcceptTouch((enabled) => !enabled)}
-              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                acceptTouch ? 'bg-amber-100 text-amber-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
-              }`}
-            >
-              Touch
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setTool('pen')}
-            className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-              tool === 'pen' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
-            }`}
-          >
+          <button type="button" onClick={handleUndo} disabled={history.length === 0} className={toolButton(false)}>
+            Undo
+          </button>
+          <button type="button" onClick={handleRedo} disabled={undone.length === 0} className={toolButton(false)}>
+            Redo
+          </button>
+
+          <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+
+          <button type="button" onClick={() => setTool('pen')} aria-pressed={tool === 'pen'} className={toolButton(tool === 'pen')}>
             Pen
           </button>
-          <div className="ml-0.5 flex items-center gap-0.5 rounded-md border border-gray-200 px-1 py-0.5">
+          <div className="flex items-center gap-0.5 rounded-md border border-line bg-surface px-1 py-0.5">
             {PEN_WEIGHTS.map((w, i) => {
               const active = tool === 'pen' && Math.abs(penWeight - w) < 0.01;
               const dotSize = 4 + i * 3;
@@ -123,78 +140,59 @@ export default function CanvasPad({
                   type="button"
                   onClick={() => { setPenWeight(w); setTool('pen'); }}
                   title={`Pen ${PEN_WEIGHT_LABELS[i]}`}
-                  className={`flex h-6 w-6 items-center justify-center rounded transition ${
-                    active ? 'bg-gray-900' : 'hover:bg-gray-100'
-                  }`}
+                  aria-label={`Pen weight ${PEN_WEIGHT_LABELS[i]}`}
+                  aria-pressed={active}
+                  className={`grid h-9 min-w-9 place-items-center rounded-sm transition ${active ? 'bg-ink' : 'hover:bg-well'}`}
                 >
                   <span
-                    className={`block rounded-full ${active ? 'bg-white' : 'bg-gray-400'}`}
+                    className={`block rounded-full ${active ? 'bg-[#f7f4ee]' : 'bg-ink-faint'}`}
                     style={{ width: dotSize, height: dotSize }}
                   />
                 </button>
               );
             })}
           </div>
-          <button
-            type="button"
-            onClick={() => setTool('eraser')}
-            className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-              tool === 'eraser' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
-            }`}
-          >
+          <button type="button" onClick={() => setTool('eraser')} aria-pressed={tool === 'eraser'} className={toolButton(tool === 'eraser')}>
             Eraser
           </button>
-          <button
-            type="button"
-            onClick={handleUndo}
-            disabled={history.length === 0}
-            className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:opacity-35"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            onClick={handleRedo}
-            disabled={undone.length === 0}
-            className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:opacity-35"
-          >
-            Redo
-          </button>
-          <button
-            type="button"
-            onClick={cyclePaperGuide}
-            title={`Paper: ${paperGuide}`}
-            className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-          >
+
+          <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+
+          <button type="button" onClick={cyclePaperGuide} title={`Paper: ${paperGuide}`} className={toolButton(false)}>
             {paperGuide === 'plain' ? 'Plain' : paperGuide === 'lines' ? 'Lines' : 'Grid'}
           </button>
-          <button
-            type="button"
-            onClick={handleAddPage}
-            title="Add page below"
-            className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-          >
+          <button type="button" onClick={handleAddPage} title="Add page below" className={toolButton(false)}>
             + Page
           </button>
-          <button
-            type="button"
-            onClick={handleClear}
-            className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-          >
+
+          <span className="mx-1 h-5 w-px bg-line" aria-hidden="true" />
+
+          <button type="button" onClick={handleClear} className="btn btn-sm btn-danger">
             Clear
           </button>
         </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        className={`block w-full ${heightClass} touch-none rounded-b-xl bg-white`}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onContextMenu={handleContextMenu}
-      />
+
+      <div className={`relative ${heightClass}`}>
+        <canvas
+          ref={baseCanvasRef}
+          className="absolute inset-0 block h-full w-full"
+          /* The element's own backdrop, visible only while the canvas paints;
+             the drawing surface itself keeps its own paper palette because the
+             exported image must match exactly what was written. */
+          style={{ backgroundColor: 'var(--color-surface)' }}
+        />
+        <canvas
+          ref={canvasRef}
+          className="relative block h-full w-full touch-none"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onContextMenu={handleContextMenu}
+        />
+      </div>
     </div>
   );
 }

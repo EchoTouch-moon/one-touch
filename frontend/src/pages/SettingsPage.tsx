@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import LegacyReviewNotice from '../components/LegacyReviewNotice';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import api from '../api/client';
-import { createUser, deleteUser, getAuthApiMessage, getPublicConfig, isAuthApiError, listUsers, type UserItem } from '../api/auth';
+import {
+  createUser,
+  deleteUser,
+  getAuthApiMessage,
+  getPublicConfig,
+  isAuthApiError,
+  listUsers,
+  updateUser,
+  type UserItem,
+} from '../api/auth';
 import { getEnrichQuota, type EnrichQuota } from '../api/enrich';
 import { getOpsStatus, getVersion, type OpsStatus, type VersionInfo } from '../api/ops';
 import { getActivity, type ActivityResponse } from '../api/profile';
@@ -19,12 +30,72 @@ type ProviderValue = 'openai' | 'ollama' | 'anthropic' | 'doubao';
 const HEATMAP_DAYS = 84;
 type SettingsTab = 'profile' | 'data' | 'llm' | 'admin';
 
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/* ── page furniture ─────────────────────────────────────────────────────────
+   Settings is an editorial account page: every block is the same card, opened
+   by an eyebrow, a title and one line of explanation. The helpers below are
+   that shape, so no section re-invents its own spacing or type. */
+
+function Section({
+  eyebrow,
+  title,
+  badge,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  badge?: ReactNode;
+  description?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <section className="card p-5 sm:p-6">
+      <p className="eyebrow">{eyebrow}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 className="text-title font-semibold text-ink">{title}</h2>
+        {badge}
+      </div>
+      {description ? <p className="mt-1.5 max-w-[62ch] text-meta text-ink-mute">{description}</p> : null}
+      {children ? <div className="mt-4 sm:mt-5">{children}</div> : null}
+    </section>
+  );
+}
+
+function Fact({ label, children, mono = false }: { label: string; children: ReactNode; mono?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <dt className="stat-label">{label}</dt>
+      <dd className={`mt-1 break-words text-meta text-ink ${mono ? 'num' : ''}`}>{children}</dd>
+    </div>
+  );
+}
+
+/* ── heatmap ────────────────────────────────────────────────────────────────
+   One hue at rising weight: the `good` token carried at four opacities on top
+   of a hairline for an empty day. The ladder is spaced so each step clears the
+   one below it by ~1.4:1, which keeps five steps legible at 16px without
+   spending a second hue on the chart. */
+
+const HEATMAP_STEPS = [
+  'bg-line',
+  'bg-good opacity-35',
+  'bg-good opacity-55',
+  'bg-good opacity-75',
+  'bg-good',
+];
+
 function intensity(count: number) {
-  if (count <= 0) return 'bg-gray-100';
-  if (count <= 1) return 'bg-emerald-200';
-  if (count <= 3) return 'bg-emerald-300';
-  if (count <= 6) return 'bg-emerald-500';
-  return 'bg-emerald-700';
+  if (count <= 0) return HEATMAP_STEPS[0];
+  if (count <= 1) return HEATMAP_STEPS[1];
+  if (count <= 3) return HEATMAP_STEPS[2];
+  if (count <= 6) return HEATMAP_STEPS[3];
+  return HEATMAP_STEPS[4];
 }
 
 function ActivityHeatmap({ activity }: { activity: ActivityResponse }) {
@@ -52,9 +123,9 @@ function ActivityHeatmap({ activity }: { activity: ActivityResponse }) {
   ), [recentDays]);
 
   return (
-    <div className="grid gap-3 md:grid-cols-[auto_minmax(16rem,1fr)]">
-      <div className="rounded-xl border border-gray-200 bg-white p-4 md:w-max md:max-w-full">
-        <div className="mx-auto w-max max-w-full overflow-x-auto">
+    <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
+      <div className="min-w-0">
+        <div className="overflow-x-auto pb-1">
           <div className="flex w-max gap-1">
             {weeks.map((week, weekIndex) => (
               <div key={weekIndex} className="grid grid-rows-7 gap-1">
@@ -62,37 +133,38 @@ function ActivityHeatmap({ activity }: { activity: ActivityResponse }) {
                   <div
                     key={day.date}
                     title={`${day.date}: ${day.captured} captured, ${day.reviewed} reviewed`}
-                    className={`h-3 w-3 rounded-[3px] ${intensity(day.total)}`}
+                    className={`h-4 w-4 rounded-xs ${intensity(day.total)}`}
                   />
                 ))}
               </div>
             ))}
           </div>
-          <div className="mt-3 flex w-max items-center justify-end gap-2 text-xs text-gray-400">
-            <span>Less</span>
-            {[0, 1, 3, 6, 9].map((value) => (
-              <span key={value} className={`h-3 w-3 rounded-[3px] ${intensity(value)}`} />
-            ))}
-            <span>More</span>
-          </div>
+        </div>
+        <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-micro text-ink-mute">Less</span>
+          {[0, 1, 3, 6, 9].map((value) => (
+            <span key={value} className={`h-4 w-4 rounded-xs ${intensity(value)}`} />
+          ))}
+          <span className="text-micro text-ink-mute">More</span>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 md:min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Last 12 weeks</p>
-        <div className="mt-4 grid grid-cols-3 gap-3 md:grid-cols-1 lg:grid-cols-3">
+      {/* Sits beside the grid so the card reads as one row instead of a small
+          chart floating in a wide empty field. */}
+      <div className="min-w-0 border-line pt-5 lg:border-l lg:pl-10 lg:pt-0">
+        <div className="grid grid-cols-3 gap-x-4 gap-y-5">
           {[
             ['Captured', summary.captured],
             ['Reviewed', summary.reviewed],
             ['Active days', summary.activeDays],
           ].map(([label, value]) => (
-            <div key={label}>
-              <p className="text-2xl font-semibold text-gray-900">{value}</p>
-              <p className="mt-1 text-xs text-gray-400">{label}</p>
+            <div key={label} className="min-w-0">
+              <p className="stat-value">{value}</p>
+              <p className="stat-label mt-1.5">{label}</p>
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs leading-5 text-gray-400">
+        <p className="mt-5 max-w-[54ch] text-micro text-ink-mute">
           Recent activity is based on capture and review events in the visible heatmap window.
         </p>
       </div>
@@ -158,82 +230,116 @@ function UsersSection() {
     }
   }, [fetchUsers]);
 
+  const handleToggleDisabled = useCallback(async (user: UserItem) => {
+    try {
+      await updateUser(user.id, { is_disabled: !user.is_disabled });
+      toast.success(user.is_disabled ? 'User enabled' : 'User disabled');
+      await fetchUsers();
+    } catch (err) {
+      const msg = isAuthApiError(err) ? getAuthApiMessage(err, 'Failed to update user') : 'Failed to update user';
+      toast.error(msg);
+    }
+  }, [fetchUsers]);
+
   return (
-    <section>
-      <div className="mb-3">
-        <h2 className="text-lg font-medium text-gray-800">Users</h2>
-        <p className="mt-1 text-xs text-gray-400">
-          Internal beta: create accounts for testers directly. Share the email + password through a secure channel.
-        </p>
-      </div>
-      <form
-        onSubmit={handleCreate}
-        className="mb-3 grid gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-[1fr_1fr_auto]"
-      >
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="tester@example.com"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          autoComplete="email"
-        />
-        <input
-          type="text"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password (8+ chars)"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:border-indigo-400 focus:outline-none"
-          autoComplete="new-password"
-        />
+    <Section
+      eyebrow="Admin"
+      title="Users"
+      description="Internal beta: create accounts for testers directly. Share the email and password through a secure channel."
+    >
+      <form onSubmit={handleCreate} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <div className="min-w-0">
+          <label className="label" htmlFor="admin-user-email">Email</label>
+          <input
+            id="admin-user-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="tester@example.com"
+            className="field"
+            autoComplete="email"
+          />
+        </div>
+        <div className="min-w-0">
+          <label className="label" htmlFor="admin-user-password">Password</label>
+          <input
+            id="admin-user-password"
+            type="text"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="8+ characters"
+            className="field num"
+            autoComplete="new-password"
+          />
+        </div>
         <button
           type="submit"
           disabled={creating || !email.trim() || password.length < 8}
-          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-40"
+          className="btn btn-primary"
         >
           {creating ? 'Creating...' : 'Create user'}
         </button>
       </form>
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
+
+      <div className="rule mt-5 pt-5">
         {loading ? (
-          <p className="text-sm text-gray-400">Loading...</p>
+          <div aria-busy="true" className="space-y-2">
+            <span className="sr-only">Loading users…</span>
+            {[0, 1].map((row) => <div key={row} className="skeleton h-16 w-full" />)}
+          </div>
         ) : users.length === 0 ? (
-          <p className="text-sm text-gray-400">No users yet.</p>
+          <div className="empty">
+            <p className="text-lead font-semibold text-ink">No accounts yet</p>
+            <p className="max-w-[38ch] text-micro text-ink-mute">
+              Create the first tester account with the form above.
+            </p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <ul className="space-y-2">
             {users.map((u) => {
               const isAdmin = u.role === 'admin';
               const isSelf = u.email === currentUserEmail;
               return (
-                <div key={u.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                <li
+                  key={u.id}
+                  className="well flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <code className="truncate font-mono text-sm text-gray-700">{u.email}</code>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
-                        isAdmin ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {u.role}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <code className="num truncate text-meta text-ink">{u.email}</code>
+                      <span className={isAdmin ? 'pill pill-brand' : 'pill pill-line'}>{u.role}</span>
+                      {u.is_disabled && <span className="pill pill-bad">disabled</span>}
                     </div>
-                    <p className="mt-0.5 text-xs text-gray-400">
+                    <p className="mt-1 text-micro text-ink-mute">
                       Created {new Date(u.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   {!isAdmin && !isSelf && (
-                    <button
-                      onClick={() => void handleDelete(u)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleDisabled(u)}
+                        className="btn btn-secondary"
+                      >
+                        {u.is_disabled ? 'Enable' : 'Disable'}
+                      </button>
+                      <span aria-hidden="true" className="h-5 w-px bg-line" />
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(u)}
+                        className="btn btn-danger"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </div>
-    </section>
+    </Section>
   );
 }
 
@@ -241,68 +347,116 @@ function ProfileSection({ activity }: { activity: ActivityResponse | null }) {
   const summary = activity?.summary;
 
   return (
-    <>
-      <div className="grid gap-3 sm:grid-cols-4">
-        {[
-          ['Total words', summary?.total_words ?? 0],
-          ['Enriched', summary?.enriched_words ?? 0],
-          ['Due now', summary?.due_count ?? 0],
-          ['Streak', `${summary?.streak_days ?? 0}d`],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-gray-200 bg-white p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <section className="mt-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-gray-800">Activity</h2>
-          <span className="text-xs text-gray-400">captured + reviewed</span>
+    <div className="space-y-5">
+      <Section
+        eyebrow="Your library"
+        title="At a glance"
+        description="Lifetime totals across every word you have captured."
+      >
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+          {[
+            ['Total words', `${summary?.total_words ?? 0}`],
+            ['Enriched', `${summary?.enriched_words ?? 0}`],
+            ['Due now', `${summary?.due_count ?? 0}`],
+            ['Streak', `${summary?.streak_days ?? 0}d`],
+          ].map(([label, value]) => (
+            <div key={label} className="min-w-0">
+              <p className="stat-value">{value}</p>
+              <p className="stat-label mt-1.5">{label}</p>
+            </div>
+          ))}
         </div>
+      </Section>
+
+      <Section
+        eyebrow="Activity"
+        title="Last 12 weeks"
+        description="Captured + reviewed, one cell per day."
+      >
         {activity ? (
           <ActivityHeatmap activity={activity} />
         ) : (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-400">
-            Loading activity...
+          <div aria-busy="true" className="space-y-4">
+            <span className="sr-only">Loading activity…</span>
+            <div className="skeleton h-36 w-full max-w-[16rem]" />
+            <div className="grid grid-cols-3 gap-4">
+              <div className="skeleton h-12" />
+              <div className="skeleton h-12" />
+              <div className="skeleton h-12" />
+            </div>
           </div>
         )}
-      </section>
-    </>
+      </Section>
+    </div>
   );
 }
 
 function DataSection({
   onExport,
   onImport,
+  opsStatus,
 }: {
   onExport: () => void;
   onImport: () => void;
+  opsStatus: OpsStatus | null;
 }) {
   return (
-    <section>
-      <h2 className="mb-3 text-lg font-medium text-gray-800">Data</h2>
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <p className="mb-4 text-sm text-gray-500">
-          Export your word data as JSON for backup or import a previous 一触 export.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={onExport}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
-          >
+    <div className="space-y-5">
+      <Section
+        eyebrow="Data"
+        title="Export & import"
+        description="Export includes version metadata, review algorithm state, definitions, handwriting sources, and review records."
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={onExport} className="btn btn-primary">
             Export JSON
           </button>
-          <button
-            onClick={onImport}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200"
-          >
+          <span aria-hidden="true" className="hidden h-5 w-px bg-line sm:block" />
+          <button type="button" onClick={onImport} className="btn btn-danger">
             Import JSON
           </button>
         </div>
-      </div>
-    </section>
+      </Section>
+
+      {opsStatus && (
+        <div className="grid gap-5 md:grid-cols-2">
+          <section className="card p-5 sm:p-6">
+            <h3 className="text-lead font-semibold text-ink">Backup status</h3>
+            <dl className="mt-4 grid gap-4">
+              <Fact label="Database">{opsStatus.database_exists ? 'available' : 'not found'}</Fact>
+              <Fact label="Backups">
+                {opsStatus.backup_enabled ? `${opsStatus.backup_retention_days}d retention` : 'off'}
+              </Fact>
+              <Fact label="Latest">
+                {opsStatus.latest_backup_at ? new Date(opsStatus.latest_backup_at).toLocaleString() : 'none yet'}
+              </Fact>
+              {opsStatus.latest_backup_path && (
+                <div className="min-w-0">
+                  <dt className="stat-label">Path</dt>
+                  <dd className="num mt-1 break-all text-micro text-ink-mute">{opsStatus.latest_backup_path}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+
+          <section className="card p-5 sm:p-6">
+            <h3 className="text-lead font-semibold text-ink">Handwriting storage</h3>
+            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
+              <div className="min-w-0">
+                <p className="stat-value">{opsStatus.handwriting_ink_count}</p>
+                <p className="stat-label mt-1.5">Ink docs</p>
+                <p className="stat-label mt-0.5">{formatBytes(opsStatus.handwriting_ink_bytes)}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="stat-value">{opsStatus.handwriting_image_count}</p>
+                <p className="stat-label mt-1.5">Previews</p>
+                <p className="stat-label mt-0.5">{formatBytes(opsStatus.handwriting_image_bytes)}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -322,73 +476,72 @@ function ServerLlmSection({
   };
 }) {
   return (
-    <div className="space-y-4">
-      <section>
-        <div className="mb-3 flex items-center gap-2">
-          <h2 className="text-lg font-medium text-gray-800">Server LLM</h2>
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-gray-500">
-            Read-only
-          </span>
-        </div>
-        <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 lg:grid lg:grid-cols-3 lg:gap-4 lg:space-y-0">
-          {loading ? (
-            <p className="text-sm text-gray-400">Loading server config...</p>
-          ) : (
-            <>
-              <div>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Provider</p>
-                <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                  {providerOptions.find((p) => p.value === llm.provider)?.label || llm.provider}
-                </p>
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Model</p>
-                <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">{llm.model}</p>
-              </div>
-              {llm.baseUrl && (
-                <div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Base URL</p>
-                  <p className="break-all rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">{llm.baseUrl}</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+    <div className="space-y-5">
+      <Section
+        eyebrow="Server LLM"
+        title="Model behind enrich"
+        badge={<span className="pill pill-line">Read-only</span>}
+        description="This deployment's provider is configured on the server and cannot be changed here."
+      >
+        {loading ? (
+          <div aria-busy="true" className="space-y-4">
+            <span className="sr-only">Loading server config…</span>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="skeleton h-12" />
+              <div className="skeleton h-12" />
+              <div className="skeleton h-12" />
+            </div>
+          </div>
+        ) : (
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <Fact label="Provider">
+              {providerOptions.find((p) => p.value === llm.provider)?.label || llm.provider}
+            </Fact>
+            <Fact label="Model" mono>{llm.model}</Fact>
+            {llm.baseUrl && <Fact label="Base URL" mono>{llm.baseUrl}</Fact>}
+          </dl>
+        )}
+      </Section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-gray-800">AI enrich quota</h2>
-        <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3">
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Daily limit</p>
-            <p className="text-2xl font-semibold text-gray-900">{quota?.limit ?? 'Unlimited'}</p>
+      <Section
+        eyebrow="AI enrich quota"
+        title="Daily allowance"
+        description="Shared across this account; it resets on the server's schedule."
+      >
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-3">
+          <div className="min-w-0">
+            <p className="stat-value">{quota?.limit ?? 'Unlimited'}</p>
+            <p className="stat-label mt-1.5">Daily limit</p>
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Used today</p>
-            <p className="text-2xl font-semibold text-gray-900">{quota?.used ?? 0}</p>
+          <div className="min-w-0">
+            <p className="stat-value">{quota?.used ?? 0}</p>
+            <p className="stat-label mt-1.5">Used today</p>
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Remaining</p>
-            <p className="text-2xl font-semibold text-gray-900">{quota?.remaining ?? 'Unlimited'}</p>
+          <div className="min-w-0">
+            <p className="stat-value">{quota?.remaining ?? 'Unlimited'}</p>
+            <p className="stat-label mt-1.5">Remaining</p>
           </div>
         </div>
-      </section>
+      </Section>
 
-      <section>
-        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <h2 className="text-lg font-medium text-gray-800">Personal API key</h2>
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-600">
-              Planned
-            </span>
-          </div>
-          <div className="grid gap-3 text-sm text-gray-500 md:grid-cols-3">
-            <p className="rounded-lg bg-gray-50 p-3">Current beta uses the server key for stability, cost control, and easier troubleshooting.</p>
-            <p className="rounded-lg bg-gray-50 p-3">When enabled, personal keys should be encrypted on the server and never shown back in full.</p>
-            <p className="rounded-lg bg-gray-50 p-3">Browser-only storage is not the default for the web app because it is harder to sync and protect.</p>
-          </div>
+      <Section
+        eyebrow="Personal API key"
+        title="Bring your own key"
+        badge={<span className="pill pill-warn">Planned</span>}
+        description="Not available in this beta — the server key keeps cost and troubleshooting predictable."
+      >
+        <div className="grid gap-3 text-micro text-ink-mute md:grid-cols-3">
+          <p className="well p-3.5">
+            Current beta uses the server key for stability, cost control, and easier troubleshooting.
+          </p>
+          <p className="well p-3.5">
+            When enabled, personal keys should be encrypted on the server and never shown back in full.
+          </p>
+          <p className="well p-3.5">
+            Browser-only storage is not the default for the web app because it is harder to sync and protect.
+          </p>
         </div>
-      </section>
+      </Section>
     </div>
   );
 }
@@ -405,77 +558,98 @@ function AdminSection({
   onToggleDiagnostics: () => void;
 }) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <UsersSection />
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-gray-800">Build</h2>
-        <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Frontend</p>
-            <p className="font-mono text-sm text-gray-700">{import.meta.env.VITE_APP_VERSION || 'dev'}</p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Built</p>
-            <p className="font-mono text-sm text-gray-700">
-              {(import.meta.env.VITE_BUILD_DATE || '').slice(0, 19) || 'dev'}
+
+      <Section
+        eyebrow="Admin"
+        title="Build"
+        description="What this frontend and its backend were built from."
+      >
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+          <Fact label="Frontend" mono>{import.meta.env.VITE_APP_VERSION || 'dev'}</Fact>
+          <Fact label="Built" mono>{(import.meta.env.VITE_BUILD_DATE || '').slice(0, 19) || 'dev'}</Fact>
+          <Fact label="Backend" mono>{versionInfo?.version || 'unknown'}</Fact>
+          <Fact label="Backups">
+            {versionInfo?.backup_enabled ? `On, ${versionInfo.backup_retention_days}d` : 'Off'}
+          </Fact>
+        </dl>
+      </Section>
+
+      <Section
+        eyebrow="Admin"
+        title="Runtime"
+        description="The database, backup policy and enrichment model this instance is running."
+      >
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+          <Fact label="DB" mono>{opsStatus?.database_engine || 'unknown'}</Fact>
+          <Fact label="Backup">
+            {opsStatus?.backup_enabled ? `On, ${opsStatus.backup_retention_days}d` : 'Off'}
+          </Fact>
+          <Fact label="LLM" mono>
+            {opsStatus?.llm_provider ? `${opsStatus.llm_provider} / ${opsStatus.llm_model || 'unset'}` : 'unknown'}
+          </Fact>
+          <Fact label="AI limit" mono>{opsStatus?.enrich_daily_limit ?? 5}/day</Fact>
+        </dl>
+      </Section>
+
+      <Section
+        eyebrow="Admin"
+        title="Beta operations"
+        description="Sign-ups and review volume across the current cohort."
+      >
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+          <div className="min-w-0">
+            <p className="stat-value">
+              {opsStatus?.regular_user_count ?? 0}
+              <span className="ml-1 text-meta font-normal text-ink-mute">
+                / {opsStatus?.registration_max_users || 'open'}
+              </span>
             </p>
+            <p className="stat-label mt-1.5">Users</p>
+            <p className="stat-label mt-0.5">{opsStatus?.disabled_user_count ?? 0} disabled</p>
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Backend</p>
-            <p className="font-mono text-sm text-gray-700">{versionInfo?.version || 'unknown'}</p>
+          <div className="min-w-0">
+            <p className="stat-value">{opsStatus?.registration_enabled ? 'Enabled' : 'Closed'}</p>
+            <p className="stat-label mt-1.5">Registration</p>
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Backups</p>
-            <p className="text-sm text-gray-700">
-              {versionInfo?.backup_enabled ? `On, ${versionInfo.backup_retention_days}d` : 'Off'}
-            </p>
+          <div className="min-w-0">
+            <p className="stat-value">{opsStatus?.active_users_7d ?? 0}</p>
+            <p className="stat-label mt-1.5">Active 7d</p>
+          </div>
+          <div className="min-w-0">
+            <p className="stat-value">{opsStatus?.reviews_7d ?? 0}</p>
+            <p className="stat-label mt-1.5">Reviews 7d</p>
           </div>
         </div>
-      </section>
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-gray-800">Runtime</h2>
-        <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">DB</p>
-            <p className="font-mono text-sm text-gray-700">{opsStatus?.database_engine || 'unknown'}</p>
+      </Section>
+
+      <Section
+        eyebrow="Admin"
+        title="AI enrich health"
+        description="Enrichment runs recorded in the current window."
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+            <div className="min-w-0">
+              <p className="stat-value">{opsStatus?.enrich_recent_total ?? 0}</p>
+              <p className="stat-label mt-1.5">Recent events</p>
+            </div>
+            <div className="min-w-0">
+              <p className="stat-value">
+                {opsStatus?.enrich_avg_duration_ms ? `${opsStatus.enrich_avg_duration_ms}ms` : 'n/a'}
+              </p>
+              <p className="stat-label mt-1.5">Avg latency</p>
+            </div>
           </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Backup</p>
-            <p className="text-sm text-gray-700">{opsStatus?.backup_enabled ? `On, ${opsStatus.backup_retention_days}d` : 'Off'}</p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">LLM</p>
-            <p className="font-mono text-sm text-gray-700">
-              {opsStatus?.llm_provider ? `${opsStatus.llm_provider} / ${opsStatus.llm_model || 'unset'}` : 'unknown'}
-            </p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">AI limit</p>
-            <p className="text-sm text-gray-700">{opsStatus?.enrich_daily_limit ?? 5}/day</p>
-          </div>
-        </div>
-      </section>
-      <section>
-        <h2 className="mb-3 text-lg font-medium text-gray-800">AI enrich health</h2>
-        <div className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3">
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Recent events</p>
-            <p className="text-2xl font-semibold text-gray-900">{opsStatus?.enrich_recent_total ?? 0}</p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Avg latency</p>
-            <p className="text-2xl font-semibold text-gray-900">
-              {opsStatus?.enrich_avg_duration_ms ? `${opsStatus.enrich_avg_duration_ms}ms` : 'n/a'}
-            </p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Status</p>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="rule pt-5">
+            <p className="eyebrow">By status</p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               {Object.entries(opsStatus?.enrich_by_status || {}).length === 0 ? (
-                <span className="text-sm text-gray-400">No events yet</span>
+                <p className="text-micro text-ink-mute">No events yet</p>
               ) : (
                 Object.entries(opsStatus?.enrich_by_status || {}).map(([status, count]) => (
-                  <span key={status} className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
+                  <span key={status} className="pill pill-neutral">
                     {status}: {count}
                   </span>
                 ))
@@ -483,20 +657,51 @@ function AdminSection({
             </div>
           </div>
         </div>
-      </section>
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-medium text-gray-800">Stylus diagnostics</h2>
-          <button
-            type="button"
-            onClick={onToggleDiagnostics}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:border-gray-300 hover:text-gray-800"
-          >
-            {showDiagnostics ? 'Hide' : 'Show'}
-          </button>
+      </Section>
+
+      <Section
+        eyebrow="Admin"
+        title="Recent signals"
+        description="The last feedback and client errors reported by the beta."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[
+            ['Feedback', opsStatus?.recent_feedback || []],
+            ['Client errors', opsStatus?.recent_client_errors || []],
+          ].map(([label, records]) => (
+            <div key={label as string} className="min-w-0 rounded-md border border-line p-4">
+              <p className="eyebrow">{label as string}</p>
+              {(records as Record<string, unknown>[]).length === 0 ? (
+                <p className="mt-3 text-micro text-ink-mute">No recent records.</p>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {(records as Record<string, unknown>[]).map((record, index) => (
+                    <li key={index} className="well px-3 py-2">
+                      <p className="truncate text-micro font-semibold text-ink">
+                        {String(record.message || record.url || record.page_url || 'record')}
+                      </p>
+                      <p className="num mt-0.5 truncate text-micro text-ink-mute">
+                        {String(record.ts || '')} {record.user_id ? `user ${record.user_id}` : ''}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
         </div>
-        {showDiagnostics && <StylusDiagnostics />}
-      </section>
+      </Section>
+
+      <Section
+        eyebrow="Admin"
+        title="Stylus diagnostics"
+        description="Pointer, pressure and prediction capabilities of this device."
+      >
+        <button type="button" onClick={onToggleDiagnostics} className="btn btn-secondary">
+          {showDiagnostics ? 'Hide' : 'Show'}
+        </button>
+        {showDiagnostics && <div className="mt-5"><StylusDiagnostics /></div>}
+      </Section>
     </div>
   );
 }
@@ -569,6 +774,9 @@ export default function SettingsPage() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
+        const preview = await api.post('/sync/import', { data, mode: 'merge' }, { params: { dry_run: true } });
+        const summary = `Import preview:\n\n${preview.data.imported} words to import\n${preview.data.skipped} skipped\n${preview.data.delete_count} deleted first\n\nContinue?`;
+        if (!window.confirm(summary)) return;
         const res = await api.post('/sync/import', { data, mode: 'merge' });
         toast.success(`Imported ${res.data.imported} words (${res.data.skipped} skipped)`);
       } catch {
@@ -582,7 +790,7 @@ export default function SettingsPage() {
     () => [
       { id: 'profile' as const, label: 'Profile' },
       { id: 'data' as const, label: 'Data' },
-      { id: 'llm' as const, label: 'LLM' },
+      { id: 'llm' as const, label: 'AI' },
       ...(role === 'admin' ? [{ id: 'admin' as const, label: 'Admin' }] : []),
     ],
     [role],
@@ -591,38 +799,64 @@ export default function SettingsPage() {
   const currentTab: SettingsTab = activeTab === 'admin' && role !== 'admin' ? 'profile' : activeTab;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-          <p className="mt-1 text-sm text-gray-500">Your vocabulary activity and personal data tools.</p>
+    <div className="page">
+      <div className="page-head">
+        <div className="page-head-text">
+          <p className="eyebrow">Account</p>
+          <h1 className="page-title">Settings</h1>
+          <p className="page-lede">Your vocabulary activity and personal data tools.</p>
         </div>
       </div>
 
-      <div className="mb-6 overflow-x-auto">
-        <div className="inline-flex min-w-full gap-1 rounded-xl border border-gray-200 bg-white p-1 sm:min-w-0">
-          {tabs.map((tab) => (
+      <LegacyReviewNotice />
+
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        className="mb-5 flex w-fit max-w-full gap-1 rounded-lg border border-line p-1"
+      >
+        {tabs.map((tab) => {
+          const active = currentTab === tab.id;
+          return (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              id={`settings-tab-${tab.id}`}
+              aria-selected={active}
+              aria-controls="settings-panel"
               onClick={() => setActiveTab(tab.id)}
-              className={`min-w-0 flex-1 rounded-lg px-3 py-2 text-sm font-medium transition sm:flex-none sm:px-4 ${
-                currentTab === tab.id
-                  ? 'bg-gray-900 text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+              className={`relative z-10 min-h-11 min-w-0 flex-1 rounded-md px-3 text-meta font-semibold transition-colors duration-[var(--dur-base)] sm:flex-none sm:px-5 ${
+                active ? 'text-ink' : 'text-ink-mute hover:text-ink-soft'
               }`}
             >
-              {tab.label}
+              {active && (
+                <motion.span
+                  layoutId="settings-tab"
+                  aria-hidden="true"
+                  transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+                  className="absolute inset-0 -z-10 rounded-md border border-line bg-surface shadow-hair"
+                />
+              )}
+              <span className="truncate">{tab.label}</span>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
+      <div
+        role="tabpanel"
+        id="settings-panel"
+        aria-labelledby={`settings-tab-${currentTab}`}
+        tabIndex={-1}
+        className="outline-none"
+      >
       {currentTab === 'profile' && <ProfileSection activity={activity} />}
       {currentTab === 'data' && (
         <DataSection
           onExport={() => void handleExport()}
           onImport={() => void handleImport()}
+          opsStatus={opsStatus}
         />
       )}
       {currentTab === 'llm' && (
@@ -636,6 +870,7 @@ export default function SettingsPage() {
           onToggleDiagnostics={() => setShowDiagnostics((value) => !value)}
         />
       )}
+      </div>
     </div>
   );
 }

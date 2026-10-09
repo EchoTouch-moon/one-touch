@@ -11,8 +11,8 @@ export async function getReviewSession(): Promise<ReviewSession> {
   return res.data;
 }
 
-export async function submitReview(data: ReviewSubmit): Promise<void> {
-  await api.post('/review/submit', data);
+export async function submitReview(data: ReviewSubmit, epoch?: number): Promise<void> {
+  await api.post('/review/submit', data, { headers: { 'X-Expected-Auth-Session': epoch } });
 }
 
 export async function getReviewStats(): Promise<ReviewStats> {

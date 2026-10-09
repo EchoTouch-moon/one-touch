@@ -1,5 +1,5 @@
-export const ICP_RECORD = import.meta.env.VITE_ICP_RECORD ?? '';
-export const ICP_URL = 'https://beian.miit.gov.cn/';
+const ICP_RECORD = import.meta.env.VITE_ICP_RECORD ?? '';
+const ICP_URL = 'https://beian.miit.gov.cn/';
 
 export default function IcpRecordLink({ className = '' }: { className?: string }) {
   if (!ICP_RECORD) return null;

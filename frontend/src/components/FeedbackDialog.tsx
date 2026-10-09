@@ -1,3 +1,4 @@
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { sendFeedback } from '../api/ops';
@@ -41,41 +42,48 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-gray-950/30 p-4 sm:items-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Feedback</h2>
-            <p className="text-xs text-gray-400">Tell us what broke or what feels off.</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800">
-            Close
-          </button>
-        </div>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={6}
-          placeholder="Describe the issue, expected behavior, or a quick idea..."
-          className="mt-4 w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-        />
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={sending || !message.trim()}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-          >
-            {sending ? 'Sending...' : 'Send'}
-          </button>
-        </div>
-      </form>
-    </div>
+    <Dialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-ink/35 backdrop-blur-[2px]" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
+        <DialogPanel className="card card-float w-full max-w-lg p-5">
+          <form onSubmit={handleSubmit}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DialogTitle className="font-display text-title font-semibold text-ink">Send feedback</DialogTitle>
+                <p className="mt-1 text-micro text-ink-mute">
+                  Tell us what broke, or what felt off. The page you are on is attached automatically.
+                </p>
+              </div>
+              <button type="button" onClick={onClose} className="btn btn-ghost btn-sm shrink-0 text-ink-mute">
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <label className="label" htmlFor="feedback-message">Message</label>
+              <textarea
+                id="feedback-message"
+                aria-label="Feedback message"
+                autoFocus
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={6}
+                placeholder="What happened, and what did you expect instead?"
+                className="field"
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={onClose} className="btn btn-ghost">
+                Cancel
+              </button>
+              <button type="submit" disabled={sending || !message.trim()} className="btn btn-primary">
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </form>
+        </DialogPanel>
+      </div>
+    </Dialog>
   );
 }

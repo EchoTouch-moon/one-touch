@@ -1,8 +1,15 @@
+export interface KaoyanCardInfo {
+  translation: string;
+  phonetic: string;
+  sentences: { id: number; year: number; paper?: string; text: string }[];
+}
+
 export interface ReviewCard {
   word_id: number;
   text: string;
   phonetic: string | null;
-  definitions: { pos: string; meaning_zh: string; canvas_image: string | null; ink_data: string | null }[];
+  definitions: { pos: string; meaning_zh: string; canvas_image: string | null; ink_data: string | null; is_primary: boolean }[];
+  kaoyan?: KaoyanCardInfo | null;
   ease_factor: number;
   interval_days: number;
   repetitions: number;
@@ -21,6 +28,7 @@ export interface ReviewStats {
   due_count: number;
   reviewed_today: number;
   total_words: number;
+  estimated_due_tomorrow: number;
 }
 
 export interface ReviewSession {

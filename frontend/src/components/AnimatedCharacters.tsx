@@ -18,7 +18,7 @@ interface PupilProps {
   forceLookY?: number;
 }
 
-function Pupil({ mouseX, mouseY, size = 12, maxDistance = 5, pupilColor = '#2D2D2D', forceLookX, forceLookY }: PupilProps) {
+function Pupil({ mouseX, mouseY, size = 12, maxDistance = 5, pupilColor = '#1D1A14', forceLookX, forceLookY }: PupilProps) {
   const pupilRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ function EyeBall({
   pupilSize = 7,
   maxDistance = 5,
   eyeColor = 'white',
-  pupilColor = '#2D2D2D',
+  pupilColor = '#1D1A14',
   isBlinking = false,
   forceLookX,
   forceLookY,
@@ -297,7 +297,7 @@ export default function AnimatedCharacters({
       <div
         ref={purpleRef}
         style={getCharStyle(
-          '#6C3FF5',
+          '#4B44D6',
           1,
           purplePos,
           {
@@ -400,7 +400,7 @@ export default function AnimatedCharacters({
       <div
         ref={blackRef}
         style={getCharStyle(
-          '#2D2D2D',
+          '#1D1A14',
           2,
           blackPos,
           {
@@ -475,7 +475,7 @@ export default function AnimatedCharacters({
       <div
         ref={orangeRef}
         style={getCharStyle(
-          '#FF9B6B',
+          '#CE7A50',
           3,
           orangePos,
           {
@@ -528,7 +528,7 @@ export default function AnimatedCharacters({
       <div
         ref={yellowRef}
         style={getCharStyle(
-          '#E8D754',
+          '#D9B34A',
           4,
           yellowPos,
           {
@@ -581,7 +581,7 @@ export default function AnimatedCharacters({
             position: 'absolute',
             width: '80px',
             height: '4px',
-            backgroundColor: '#2D2D2D',
+            backgroundColor: '#1D1A14',
             borderRadius: '999px',
             left:
               isLookingAway

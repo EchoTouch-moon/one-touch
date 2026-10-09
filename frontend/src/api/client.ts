@@ -17,6 +17,11 @@ api.interceptors.request.use((config) => {
     return config;
   }
 
+  const expected = config.headers['X-Expected-Auth-Session'];
+  if (expected && Number(expected) !== getAuthSessionEpoch()) {
+    throw new axios.CanceledError('Account changed');
+  }
+  delete config.headers['X-Expected-Auth-Session'];
   const token = getCurrentAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

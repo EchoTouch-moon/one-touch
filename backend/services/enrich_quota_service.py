@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.enrich_usage import AiEnrichUsage
@@ -81,17 +81,23 @@ async def reserve_enrich(
     if role == "admin":
         return await get_quota(session, user_id=user_id, role=role, daily_limit=daily_limit, day=day)
 
+    await session.execute(
+        insert(AiEnrichUsage)
+        .values(user_id=user_id, usage_date=day, count=0)
+        .prefix_with("OR IGNORE")
+    )
+    result = await session.execute(
+        update(AiEnrichUsage)
+        .where(
+            AiEnrichUsage.user_id == user_id,
+            AiEnrichUsage.usage_date == day,
+            AiEnrichUsage.count < daily_limit,
+        )
+        .values(count=AiEnrichUsage.count + 1)
+    )
     record = await get_usage_record(session, user_id, day)
-    if record is None:
-        record = AiEnrichUsage(user_id=user_id, usage_date=day, count=0)
-        session.add(record)
-        await session.flush()
-
-    if record.count >= daily_limit:
-        raise EnrichQuotaExceeded(quota_from_count(record.count, daily_limit, day))
-
-    record.count += 1
-    await session.flush()
+    if (result.rowcount or 0) == 0:
+        raise EnrichQuotaExceeded(quota_from_count(record.count if record else daily_limit, daily_limit, day))
     return quota_from_count(record.count, daily_limit, day)
 
 
@@ -106,8 +112,11 @@ async def release_enrich(
         return
 
     day = day or today_utc()
-    record = await get_usage_record(session, user_id, day)
-    if record is None:
-        return
-    record.count = max(0, record.count - 1)
-    await session.flush()
+    await session.execute(
+        update(AiEnrichUsage)
+        .where(
+            AiEnrichUsage.user_id == user_id,
+            AiEnrichUsage.usage_date == day,
+        )
+        .values(count=func.max(AiEnrichUsage.count - 1, 0))
+    )

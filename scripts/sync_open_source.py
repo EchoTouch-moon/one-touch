@@ -19,6 +19,13 @@ SENSITIVE_PATTERNS = [
     re.compile(r"82\.157\.5\.124"),
     re.compile(r"鲁ICP备"),
     re.compile(r"sk-[A-Za-z0-9_-]{12,}"),
+    # Deployment/infrastructure markers that must never reach the public copy.
+    re.compile(r"ubuntu@"),
+    re.compile(r"id_ed25519"),
+    re.compile(r"/home/ubuntu"),
+    re.compile(r"lhins-[a-z0-9]+"),
+    re.compile(r"dnspod", re.IGNORECASE),
+    re.compile(r"oneadmin"),
 ]
 
 FORBIDDEN_FILE_PATTERNS = [

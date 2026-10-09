@@ -44,3 +44,20 @@ export const LINE_SPACING = 50;
 export const GRID_SPACING = 40;
 
 export const INK_VERSION = 3;
+
+// Outline (perfect-freehand) renderer parameters.
+// Tapers are disabled (0): everyday handwriting (letters, digits) reads best
+// with full-width round caps; tapers narrow short strokes like the bars of "E".
+export const OUTLINE_THINNING = 0.5;
+export const OUTLINE_SMOOTHING = 0.45;
+export const OUTLINE_STREAMLINE = 0.15;
+export const OUTLINE_START_TAPER = 0;
+export const OUTLINE_END_TAPER = 0;
+export const OUTLINE_SIZE_GAIN = 0.55;
+
+// One Euro Filter parameters for pointer input smoothing.
+// minCutoff is kept high enough that short fast strokes (flicks, letter tails)
+// do not collapse at the stroke start before the filter converges.
+export const ONE_EURO_MIN_CUTOFF = 5.5;
+export const ONE_EURO_BETA = 0.05;
+export const ONE_EURO_D_CUTOFF = 1.0;

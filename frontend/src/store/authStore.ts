@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as authApi from '../api/auth';
 import {
-  bumpAuthSessionEpoch,
+  getAuthSessionEpoch,
+  setCurrentUserId,
   getCurrentAuthToken,
   replaceCurrentAuthToken,
   setCurrentAuthToken,
@@ -10,6 +11,7 @@ import {
 
 interface AuthState {
   token: string | null;
+  userId: number | null;
   username: string | null;
   role: string | null;
   loading: boolean;
@@ -29,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       token: null,
+      userId: null,
       username: null,
       role: null,
       loading: false,
@@ -39,14 +42,15 @@ export const useAuthStore = create<AuthState>()(
         set({ loading: true, error: null });
         try {
           const res = await authApi.login(username, password);
+          replaceCurrentAuthToken(res.token, res.user_id);
           set({
+            userId: res.user_id,
             token: res.token,
             username: res.username,
             role: res.role,
             loading: false,
             initialized: true,
           });
-          replaceCurrentAuthToken(res.token);
           return true;
         } catch {
           set({ loading: false, error: 'Invalid email or password' });
@@ -129,10 +133,10 @@ export const useAuthStore = create<AuthState>()(
       clearError: () => set({ error: null }),
 
       logout: () => {
-        bumpAuthSessionEpoch();
-        setCurrentAuthToken(null);
+        replaceCurrentAuthToken(null);
         set({
           token: null,
+          userId: null,
           username: null,
           role: null,
           loading: false,
@@ -150,13 +154,15 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        replaceCurrentAuthToken(token);
+        const epoch = replaceCurrentAuthToken(token);
         set({ loading: true, error: null });
         try {
           const res = await authApi.getAuthStatus();
-          if (!res.authenticated) {
+          if (epoch !== getAuthSessionEpoch()) return;
+          if (!res.authenticated || res.user_id === null) {
             set({
               token: null,
+              userId: null,
               username: null,
               role: null,
               loading: false,
@@ -165,7 +171,9 @@ export const useAuthStore = create<AuthState>()(
             setCurrentAuthToken(null);
             return;
           }
+          setCurrentUserId(res.user_id);
           set({
+            userId: res.user_id,
             username: res.username,
             role: res.role,
             loading: false,
@@ -173,8 +181,10 @@ export const useAuthStore = create<AuthState>()(
           });
           setCurrentAuthToken(token);
         } catch {
+          if (epoch !== getAuthSessionEpoch()) return;
           set({
             token: null,
+            userId: null,
             username: null,
             role: null,
             loading: false,
@@ -188,6 +198,7 @@ export const useAuthStore = create<AuthState>()(
       name: 'glm-words-auth',
       partialize: (state) => ({
         token: state.token,
+        userId: state.userId,
         username: state.username,
         role: state.role,
       }),

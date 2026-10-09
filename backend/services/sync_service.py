@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Optional
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,12 +25,12 @@ async def _delete_scoped_words(
     *,
     user_id: Optional[int] = None,
     role: Optional[str] = None,
-) -> None:
+) -> int:
     word_id_query = select(Word.id)
     word_id_query = _scope(word_id_query, user_id, role)
     word_ids = list((await session.execute(word_id_query)).scalars().all())
     if not word_ids:
-        return
+        return 0
 
     definition_ids = list(
         (
@@ -50,6 +50,19 @@ async def _delete_scoped_words(
     await session.execute(delete(ReviewRecord).where(ReviewRecord.word_id.in_(word_ids)))
     await session.execute(delete(Word).where(Word.id.in_(word_ids)))
     await session.flush()
+    return len(word_ids)
+
+
+async def _count_scoped_words(
+    session: AsyncSession,
+    *,
+    user_id: Optional[int] = None,
+    role: Optional[str] = None,
+) -> int:
+    query = select(func.count()).select_from(Word)
+    query = _scope(query, user_id, role)
+    result = await session.execute(query)
+    return result.scalar() or 0
 
 
 async def _find_word_by_text(
@@ -70,6 +83,8 @@ async def export_all(
     *,
     user_id: Optional[int] = None,
     role: Optional[str] = None,
+    app_version: str = "dev",
+    review_algorithm: str = "sm2",
 ) -> dict:
     query = select(Word).options(
         selectinload(Word.definitions).selectinload(Definition.examples),
@@ -82,7 +97,10 @@ async def export_all(
 
     export_data = {
         "version": "1.0",
+        "export_version": "2.0",
         "exported_at": datetime.now(UTC).isoformat(),
+        "app_version": app_version,
+        "review_algorithm": review_algorithm,
         "words": [],
     }
 
@@ -101,6 +119,10 @@ async def export_all(
                 "pos": defn.pos,
                 "meaning_en": defn.meaning_en,
                 "meaning_zh": defn.meaning_zh,
+                "canvas_image": defn.canvas_image,
+                "ink_data": defn.ink_data,
+                "order": defn.order,
+                "is_primary": defn.is_primary,
                 "examples": [
                     {
                         "sentence_en": ex.sentence_en,
@@ -147,7 +169,37 @@ async def import_data(
     *,
     user_id: Optional[int] = None,
     role: Optional[str] = None,
+    dry_run: bool = False,
 ) -> dict:
+    delete_count = await _count_scoped_words(session, user_id=user_id, role=role) if mode == "replace" else 0
+
+    imported = 0
+    skipped = 0
+    conflicts: list[str] = []
+
+    for word_data in data.get("words", []):
+        text = word_data.get("text", "").strip().lower()
+        if not text:
+            continue
+
+        existing_word = await _find_word_by_text(session, text, user_id=user_id, role=role)
+
+        if mode == "merge" and existing_word:
+            skipped += 1
+            conflicts.append(text)
+            continue
+
+        imported += 1
+
+    if dry_run:
+        return {
+            "dry_run": True,
+            "imported": imported,
+            "skipped": skipped,
+            "conflicts": conflicts[:50],
+            "delete_count": delete_count,
+        }
+
     if mode == "replace":
         await _delete_scoped_words(session, user_id=user_id, role=role)
 
@@ -165,11 +217,6 @@ async def import_data(
             skipped += 1
             continue
 
-        global_existing = await session.execute(select(Word.id).where(Word.text == text))
-        if global_existing.scalar_one_or_none() is not None:
-            skipped += 1
-            continue
-
         word = Word(
             text=text,
             phonetic=word_data.get("phonetic"),
@@ -179,12 +226,18 @@ async def import_data(
         session.add(word)
         await session.flush()
 
-        for def_data in word_data.get("definitions", []):
+        definitions = word_data.get("definitions", [])
+        has_primary = any(bool(def_data.get("is_primary", False)) for def_data in definitions)
+        for i, def_data in enumerate(definitions):
             defn = Definition(
                 word_id=word.id,
                 pos=def_data.get("pos", "unknown"),
                 meaning_en=def_data.get("meaning_en", ""),
                 meaning_zh=def_data.get("meaning_zh", ""),
+                canvas_image=def_data.get("canvas_image"),
+                ink_data=def_data.get("ink_data"),
+                order=def_data.get("order", i),
+                is_primary=bool(def_data.get("is_primary", False)) or (i == 0 and not has_primary),
             )
             session.add(defn)
             await session.flush()
@@ -236,4 +289,4 @@ async def import_data(
         imported += 1
 
     await session.flush()
-    return {"imported": imported, "skipped": skipped}
+    return {"dry_run": False, "imported": imported, "skipped": skipped, "conflicts": [], "delete_count": delete_count}

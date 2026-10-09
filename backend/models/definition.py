@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -24,6 +24,7 @@ class Definition(Base):
     canvas_image: Mapped[str | None] = mapped_column(Text, nullable=True)
     ink_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     order: Mapped[int] = mapped_column(Integer, default=0)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
 
     word: Mapped["Word"] = relationship(back_populates="definitions")
     examples: Mapped[list["ExampleSentence"]] = relationship(

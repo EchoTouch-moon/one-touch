@@ -7,10 +7,11 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY backend ./backend
+COPY data/kaoyan/kaoyan_words.json data/kaoyan/exam_sentences.json ./data/kaoyan/
 COPY README.md ./README.md
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple uv && \
     uv pip install --system --index-url https://pypi.tuna.tsinghua.edu.cn/simple .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

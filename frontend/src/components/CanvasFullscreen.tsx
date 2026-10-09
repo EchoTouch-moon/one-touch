@@ -1,3 +1,4 @@
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useEffect, useState } from 'react';
 import CanvasPad from './CanvasPad';
 
@@ -11,6 +12,7 @@ interface CanvasFullscreenProps {
   saving?: boolean;
   onSave: (image: string | null, ink: string | null) => void;
   onCancel: () => void;
+  onDraftChange?: (image: string | null, ink: string | null) => void;
 }
 
 export default function CanvasFullscreen({
@@ -23,64 +25,49 @@ export default function CanvasFullscreen({
   saving = false,
   onSave,
   onCancel,
+  onDraftChange,
 }: CanvasFullscreenProps) {
   const [image, setImage] = useState<string | null>(initialImage);
   const [ink, setInk] = useState<string | null>(initialInk);
 
-  useEffect(() => {
-    if (!open) return;
-    const frame = window.requestAnimationFrame(() => {
-      setImage(initialImage);
-      setInk(initialInk);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [open, initialImage, initialInk]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
+  useEffect(() => { if (open) onDraftChange?.(image, ink); }, [image, ink, open, onDraftChange]);
 
   if (!open) return null;
 
   const canSave = Boolean(image || ink);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-100">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-        >
-          Cancel
-        </button>
-        <span className="truncate text-sm font-medium text-gray-500">{title ?? 'Handwriting'}</span>
-        <button
-          type="button"
-          onClick={() => onSave(image, ink)}
-          disabled={!canSave || saving}
-          className="rounded-md bg-indigo-500 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-600 disabled:opacity-40"
-        >
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-      </div>
-      <div className="flex min-h-0 flex-1 p-3">
-        <CanvasPad
-          value={image}
-          onChange={setImage}
-          inkValue={ink}
-          onInkChange={setInk}
-          fullHeight
-          resetKey={resetKey}
-          draftKey={draftKey ?? null}
-          rebuildPreviewOnLoad
-        />
-      </div>
-    </div>
+    <Dialog open={open} onClose={onCancel} className="relative z-50">
+      <DialogPanel className="app-canvas fixed inset-0 flex flex-col pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-surface/90 px-3 py-2 backdrop-blur-xl sm:px-4">
+          <button type="button" onClick={onCancel} className="btn btn-ghost btn-sm">
+            Cancel
+          </button>
+          <DialogTitle className="min-w-0 truncate text-meta font-semibold text-ink">
+            {title ?? 'Handwriting'}
+          </DialogTitle>
+          <button
+            type="button"
+            onClick={() => onSave(image, ink)}
+            disabled={!canSave || saving}
+            className="btn btn-primary btn-sm"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+        <div className="flex min-h-0 flex-1 p-2.5 sm:p-3">
+          <CanvasPad
+            value={image}
+            onChange={setImage}
+            inkValue={ink}
+            onInkChange={setInk}
+            fullHeight
+            resetKey={resetKey}
+            draftKey={draftKey ?? null}
+            rebuildPreviewOnLoad
+          />
+        </div>
+      </DialogPanel>
+    </Dialog>
   );
 }

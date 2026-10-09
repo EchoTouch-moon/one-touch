@@ -1,0 +1,104 @@
+/* ── App shell layout ────────────────────────────────────────────────────────
+   One viewport budget, shared by the chrome, the cards and the editing
+   surfaces, so nothing has to guess how much room is left.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* The shell reserves the tab-bar clearance once, and every full-height route is
+   sized from one explicit calculation.
+   This has to be a *definite* height, not a flex-derived one: the flashcard is
+   built from percentage heights (`h-full` down four levels), and percentages do
+   not resolve against a flex item whose own height is `auto` — the card silently
+   collapsed to zero. */
+.app-shell {
+  min-height: 100dvh;
+}
+
+/* Scrolling routes need clearance for the fixed tab bar; full-height routes get
+   the tab bar subtracted from their own height instead. */
+.app-main {
+  padding-bottom: var(--shell-bottom);
+}
+
+.app-main:has(.viewport-page),
+.app-main:has(.review-layout),
+.app-main:has(.capture-editor) {
+  padding-bottom: 0;
+}
+
+/* Fixed height keeps the viewport arithmetic exact even if the ICP line wraps. */
+.app-footer {
+  display: grid;
+  place-items: center;
+  height: var(--footer-h);
+  overflow: hidden;
+}
+
+.viewport-page,
+.review-layout,
+.capture-editor {
+  height: calc(100dvh - var(--shell-top) - var(--shell-bottom) - var(--footer-h));
+}
+
+/* The flashcard column. `.review-layout` now has a definite height, so the
+   percentage chain inside the card (four `h-full` levels) resolves again. */
+.review-card-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+}
+
+.review-card-frame {
+  height: 100%;
+  width: 100%;
+  max-height: 30rem;
+}
+
+.review-swipe-zone,
+.review-swipe-zone * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.review-swipe-zone {
+  touch-action: auto;
+  user-select: none;
+}
+
+/* Bottom navigation: the active tab gets an ink dot and a weight change rather
+   than a colour swap alone, so it reads at a glance without relying on hue. */
+.tabbar-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  color: var(--color-ink-mute);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color var(--dur-quick) ease;
+}
+.tabbar-item[aria-current="page"] {
+  color: var(--color-ink);
+}
+.tabbar-item::before {
+  content: "";
+  position: absolute;
+  top: 0.35rem;
+  width: 1.4rem;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  transform: scaleX(0);
+  transition: transform var(--dur-base) var(--ease-out-expo);
+}
+.tabbar-item[aria-current="page"]::before {
+  transform: scaleX(1);
+}
+.tabbar-item svg {
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+.tabbar-item[aria-current="page"] svg {
+  transform: translateY(-1px) scale(1.06);
+}

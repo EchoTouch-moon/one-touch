@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -13,9 +13,12 @@ if TYPE_CHECKING:
 
 class Word(Base):
     __tablename__ = "words"
+    __table_args__ = (
+        Index("ix_words_user_text_unique", "user_id", "text", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    text: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    text: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     phonetic: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="captured")
     user_id: Mapped[Optional[int]] = mapped_column(

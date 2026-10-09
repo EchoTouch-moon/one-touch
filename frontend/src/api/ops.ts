@@ -23,6 +23,20 @@ export interface OpsStatus {
   enrich_recent_total: number;
   enrich_by_status: Record<string, number>;
   enrich_avg_duration_ms: number | null;
+  regular_user_count: number;
+  disabled_user_count: number;
+  registration_enabled: boolean;
+  registration_max_users: number;
+  active_users_7d: number;
+  reviews_7d: number;
+  latest_backup_at: string | null;
+  latest_backup_path: string;
+  handwriting_ink_count: number;
+  handwriting_image_count: number;
+  handwriting_ink_bytes: number;
+  handwriting_image_bytes: number;
+  recent_feedback: Record<string, unknown>[];
+  recent_client_errors: Record<string, unknown>[];
 }
 
 export interface ClientErrorPayload {

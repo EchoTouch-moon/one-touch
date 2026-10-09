@@ -44,9 +44,14 @@ class LoginRateLimiter:
     def check(self, request: Request, username: str) -> None:
         key = self._key(request, username)
         now = time.monotonic()
-        bucket = self.attempts[key]
+        bucket = self.attempts.get(key)
+        if bucket is None:
+            return
         while bucket and now - bucket[0] > self.window_seconds:
             bucket.popleft()
+        if not bucket:
+            self.attempts.pop(key, None)
+            return
         if len(bucket) >= self.max_attempts:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -60,3 +65,34 @@ class LoginRateLimiter:
     def reset(self, request: Request, username: str) -> None:
         key = self._key(request, username)
         self.attempts.pop(key, None)
+
+
+@dataclass
+class IpRateLimiter:
+    max_attempts: int
+    window_seconds: int
+    attempts: dict[str, deque[float]] = field(default_factory=lambda: defaultdict(deque))
+
+    def _key(self, request: Request) -> str:
+        client = request.client.host if request.client else "unknown"
+        return client
+
+    def check(self, request: Request) -> None:
+        key = self._key(request)
+        now = time.monotonic()
+        bucket = self.attempts.get(key)
+        if bucket is None:
+            return
+        while bucket and now - bucket[0] > self.window_seconds:
+            bucket.popleft()
+        if not bucket:
+            self.attempts.pop(key, None)
+            return
+        if len(bucket) >= self.max_attempts:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests. Please try again later.",
+            )
+
+    def record(self, request: Request) -> None:
+        self.attempts[self._key(request)].append(time.monotonic())

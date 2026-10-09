@@ -98,6 +98,16 @@ async def create_email_verification(
     purpose: str = "register",
 ) -> EmailVerification:
     normalized_email = email.strip().lower()
+    stale = await session.execute(
+        select(EmailVerification).where(
+            EmailVerification.email == normalized_email,
+            EmailVerification.purpose == purpose,
+            EmailVerification.consumed_at.is_(None),
+        )
+    )
+    for old in stale.scalars().all():
+        old.consumed_at = datetime.now(UTC)
+
     verification = EmailVerification(
         email=normalized_email,
         purpose=purpose,
@@ -154,6 +164,7 @@ async def verify_email_code(
 
 async def update_user_password(session: AsyncSession, user: User, password_hash: str) -> User:
     user.password_hash = password_hash
+    user.credentials_updated_at = datetime.now(UTC)
     await session.flush()
     await session.refresh(user)
     return user
@@ -180,6 +191,18 @@ async def delete_user(session: AsyncSession, user_id: int) -> bool:
     await session.delete(user)
     await session.flush()
     return True
+
+
+async def set_user_disabled(session: AsyncSession, user_id: int, disabled: bool) -> User | None:
+    user = await session.get(User, user_id)
+    if user is None or user.role == "admin":
+        return None
+    user.is_disabled = disabled
+    if disabled:
+        user.credentials_updated_at = datetime.now(UTC)
+    await session.flush()
+    await session.refresh(user)
+    return user
 
 
 async def revoke_invite_code(session: AsyncSession, code_id: int) -> bool:

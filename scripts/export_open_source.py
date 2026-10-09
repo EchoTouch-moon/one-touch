@@ -11,6 +11,7 @@ from pathlib import Path
 SKIP_DIRS = {
     ".git",
     ".claude",
+    ".workbuddy",
     "__pycache__",
     ".pytest_cache",
     ".ruff_cache",
@@ -21,6 +22,7 @@ SKIP_DIRS = {
     "logs",
     "backups",
     "data",
+    "output",
     "temp",
     "tmp",
 }
@@ -32,6 +34,8 @@ SKIP_NAMES = {
     "stylus diagnostics.jpg",
     "AI开发.md",
     "简历.md",
+    # Personal document: never publish, even if it is moved out of output/.
+    "一触项目_AI应用开发面试速答手册.pdf",
 }
 
 SKIP_PATTERNS = [

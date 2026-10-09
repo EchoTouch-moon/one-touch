@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { getCurrentUserId, getAuthSessionEpoch } from '../api/authSession';
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { WordDetail, Definition } from '../types/word';
 import api from '../api/client';
 import { addDefinition, deleteDefinition, updateDefinition, updateWord } from '../api/words';
 import { enrichWord, getEnrichErrorMessage } from '../api/enrich';
 import CanvasFullscreen from '../components/CanvasFullscreen';
-import { deleteDraftRecord } from '../components/canvas-pad/draftStore';
+import { deleteDraftRecord, flushDraftWrites } from '../components/canvas-pad/draftStore';
 import { useSettingsStore } from '../store/settingsStore';
 
 const POS_OPTIONS = ['n.', 'v.', 'vi.', 'vt.', 'adj.', 'adv.', 'prep.', 'conj.', 'pron.', 'phr.'];
@@ -36,6 +39,8 @@ function definitionLabel(def: Definition): string {
 
 function pickPrimaryDef(defs: Definition[]): Definition | null {
   if (defs.length === 0) return null;
+  const configured = defs.find((def) => def.is_primary);
+  if (configured) return configured;
   const handwritten = defs.find(isHandwritingDef);
   return handwritten ?? defs[0];
 }
@@ -65,14 +70,54 @@ export default function WordDetailPage() {
   );
   const [savingHandwriting, setSavingHandwriting] = useState(false);
 
+  const [typedBaseline, setTypedBaseline] = useState(JSON.stringify(emptyTypedForm()));
+  const [handwritingDraft, setHandwritingDraft] = useState<{ image: string | null; ink: string | null }>({ image: null, ink: null });
+  const draftStorageKey = `glm-detail-editor-v2:${getCurrentUserId()}:${id}`;
+  const [recoverable, setRecoverable] = useState(() => localStorage.getItem(draftStorageKey) !== null);
+  const typedDirty = (typedAdding || typedEditId !== null) && JSON.stringify(typedForm) !== typedBaseline;
+  const inkDirty = fullscreenOpen && (handwritingDraft.image !== fullscreenInitial.image || handwritingDraft.ink !== fullscreenInitial.ink);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keepDraft = useCallback(async () => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    localStorage.setItem(draftStorageKey, JSON.stringify({ typedForm, typedEditId, typedAdding, fullscreenEditId, fullscreenOpen, handwritingDraft, fullscreenInitial }));
+    await flushDraftWrites();
+  }, [draftStorageKey, typedForm, typedEditId, typedAdding, fullscreenEditId, fullscreenOpen, handwritingDraft, fullscreenInitial]);
+  const discardDraft = useCallback(async () => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    const key = `glm-words-ink-draft:user-${getCurrentUserId()}:detail-${id}-${fullscreenEditId ?? 'new'}`;
+    await deleteDraftRecord(key);
+    localStorage.removeItem(key); localStorage.removeItem(draftStorageKey); setRecoverable(false);
+  }, [id, fullscreenEditId, draftStorageKey]);
+  const exitGuard = useUnsavedChanges(typedDirty || inkDirty, keepDraft, discardDraft);
+  const onDraftChange = useCallback((image: string | null, ink: string | null) => setHandwritingDraft({ image, ink }), []);
+  const restoreDraft = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftStorageKey) ?? 'null');
+      if (!saved) return;
+      setTypedForm(saved.typedForm); setTypedEditId(saved.typedEditId); setTypedAdding(saved.typedAdding);
+      if (saved.fullscreenOpen) {
+        setFullscreenEditId(saved.fullscreenEditId);
+        setFullscreenInitial(saved.fullscreenInitial);
+        setHandwritingDraft(saved.handwritingDraft); setFullscreenOpen(true);
+      }
+    } catch { toast.error('Could not restore draft. It has been preserved.'); }
+  };
+  useEffect(() => {
+    if (!typedDirty && !inkDirty) return;
+    draftTimer.current = setTimeout(() => void keepDraft().catch(() => undefined), 300);
+    return () => { if (draftTimer.current) clearTimeout(draftTimer.current); };
+  }, [typedDirty, inkDirty, keepDraft]);
+
   const setSavedInputMode = useSettingsStore((s) => s.setDefinitionInputMode);
 
   const fetchWord = useCallback(() => {
     if (!id) return;
+    const epoch = getAuthSessionEpoch();
     setLoading(true);
     api
       .get<WordDetail>(`/words/${id}`)
       .then((res) => {
+        if (epoch !== getAuthSessionEpoch()) return;
         setWord(res.data);
         setPhonetic(res.data.phonetic || '');
       })
@@ -132,14 +177,12 @@ export default function WordDetailPage() {
     }
   };
 
-  const clearDraft = (wordId: number, defId: number | null) => {
-    const key = `glm-words-ink-draft:detail-${wordId}-${defId ?? 'new'}`;
-    try {
-      window.localStorage.removeItem(key);
-    } catch {
-      // best-effort
-    }
-    void deleteDraftRecord(key).catch(() => undefined);
+  const clearDraft = async (wordId: number, defId: number | null) => {
+    const key = `glm-words-ink-draft:user-${getCurrentUserId()}:detail-${wordId}-${defId ?? 'new'}`;
+    await deleteDraftRecord(key);
+    localStorage.removeItem(key);
+    localStorage.removeItem(draftStorageKey);
+    setRecoverable(false);
   };
 
   // Typed-definition editor
@@ -147,6 +190,7 @@ export default function WordDetailPage() {
     setTypedAdding(true);
     setTypedEditId(null);
     setTypedForm(emptyTypedForm());
+    setTypedBaseline(JSON.stringify(emptyTypedForm()));
     setSavedInputMode('keyboard');
     window.requestAnimationFrame(() => {
       typedEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -161,6 +205,7 @@ export default function WordDetailPage() {
       meaning_en: def.meaning_en,
       meaning_zh: def.meaning_zh === HANDWRITING_LABEL ? '' : def.meaning_zh,
     });
+    setTypedBaseline(JSON.stringify({ pos: def.pos, meaning_en: def.meaning_en, meaning_zh: def.meaning_zh === HANDWRITING_LABEL ? '' : def.meaning_zh }));
     window.requestAnimationFrame(() => {
       typedEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
@@ -194,6 +239,7 @@ export default function WordDetailPage() {
         await addDefinition(word.id, payload);
         toast.success('Definition added');
       }
+      localStorage.removeItem(draftStorageKey); setRecoverable(false);
       closeTyped();
       fetchWord();
     } catch {
@@ -206,6 +252,7 @@ export default function WordDetailPage() {
   // Fullscreen handwriting editor
   const openHandwritingAdd = () => {
     setFullscreenEditId(null);
+    setHandwritingDraft({ image: null, ink: null });
     setFullscreenInitial({ image: null, ink: null, pos: 'n.' });
     setSavedInputMode('handwriting');
     setFullscreenOpen(true);
@@ -213,6 +260,7 @@ export default function WordDetailPage() {
 
   const openHandwritingEdit = (def: Definition) => {
     setFullscreenEditId(def.id);
+    setHandwritingDraft({ image: def.canvas_image, ink: def.ink_data });
     setFullscreenInitial({
       image: def.canvas_image,
       ink: def.ink_data,
@@ -222,7 +270,6 @@ export default function WordDetailPage() {
   };
 
   const closeHandwriting = () => {
-    if (word) clearDraft(word.id, fullscreenEditId);
     setFullscreenOpen(false);
     setFullscreenEditId(null);
     setFullscreenInitial({ image: null, ink: null, pos: 'n.' });
@@ -249,8 +296,8 @@ export default function WordDetailPage() {
         await addDefinition(word.id, payload);
         toast.success('Definition added');
       }
-      if (fullscreenEditId !== null) clearDraft(word.id, fullscreenEditId);
-      else clearDraft(word.id, null);
+      if (fullscreenEditId !== null) await clearDraft(word.id, fullscreenEditId);
+      else await clearDraft(word.id, null);
       setFullscreenOpen(false);
       setFullscreenEditId(null);
       fetchWord();
@@ -282,6 +329,19 @@ export default function WordDetailPage() {
     userSelectedDefRef.current = true;
   };
 
+  const handleSetPrimary = async (def: Definition) => {
+    if (!word || def.is_primary) return;
+    try {
+      await updateDefinition(word.id, def.id, { is_primary: true });
+      toast.success('Primary definition updated');
+      setSelectedDefId(def.id);
+      userSelectedDefRef.current = true;
+      fetchWord();
+    } catch {
+      toast.error('Failed to update primary definition');
+    }
+  };
+
   const handleEditPrimary = () => {
     if (!primaryDef) return;
     if (isHandwritingDef(primaryDef)) {
@@ -291,8 +351,38 @@ export default function WordDetailPage() {
     }
   };
 
-  if (loading) return <p className="py-8 text-center text-gray-400">Loading...</p>;
-  if (!word) return <p className="py-8 text-center text-gray-400">Word not found</p>;
+  if (loading) {
+    return (
+      <div className="page" aria-busy="true" aria-live="polite">
+        <div className="skeleton h-4 w-16" />
+        <div className="mt-6 grid gap-6 lg:grid-cols-[17rem_1fr] lg:gap-10">
+          <div className="space-y-4">
+            <div className="skeleton h-11 w-48" />
+            <div className="skeleton h-4 w-32" />
+            <div className="skeleton h-10 w-28" />
+          </div>
+          <div className="space-y-3">
+            <div className="card h-40" />
+            <div className="card h-24" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!word) {
+    return (
+      <div className="page viewport-page flex items-center justify-center">
+        <div className="empty max-w-md">
+          <p className="text-lead font-semibold text-ink">This word is not here</p>
+          <p className="max-w-[36ch] text-meta text-ink-mute">
+            It may have been deleted, or it belongs to another account.
+          </p>
+          <Link to="/words" className="btn btn-secondary btn-sm mt-1">Back to words</Link>
+        </div>
+      </div>
+    );
+  }
 
   const hasMultiple = word.definitions.length > 1;
   const showTabStrip = hasMultiple;
@@ -301,256 +391,331 @@ export default function WordDetailPage() {
   const isEditingTyped = typedAdding || typedEditId !== null;
   const otherDefs = primaryDef ? word.definitions.filter((d) => d.id !== primaryDef.id) : word.definitions;
 
+  const statusTone = word.status === 'mastered' ? 'pill-good' : word.status === 'enriched' ? 'pill-brand' : 'pill-neutral';
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 lg:px-6 lg:py-8">
+    <div className="page">
+      <UnsavedChangesDialog {...exitGuard.dialog} />
+
+      {recoverable && (
+        <button type="button" className="btn btn-secondary btn-block mb-5" onClick={restoreDraft}>
+          Continue editing your draft
+        </button>
+      )}
+
       <button
-        onClick={() => navigate(-1)}
-        className="text-sm text-indigo-500 hover:underline"
+        type="button"
+        onClick={() => { if (window.history.state?.idx > 0) navigate(-1); else navigate('/words'); }}
+        className="btn btn-ghost btn-sm -ml-2.5 text-ink-mute"
       >
-        &larr; Back
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+        Back
       </button>
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[18rem_1fr] lg:gap-10">
-        {/* Left aside: word identity */}
-        <aside className="space-y-4">
+      <div className="mt-5 grid gap-7 lg:grid-cols-[17rem_1fr] lg:gap-12">
+        {/* ── Left: identity and the actions that belong to it ── */}
+        <aside className="space-y-5">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 lg:text-5xl">{word.text}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <p className="eyebrow">Word</p>
+            <h1 className="word mt-2.5 text-display text-ink">{word.text}</h1>
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
               {editingPhonetic ? (
-                <div className="flex items-center gap-1">
+                <span className="flex items-center gap-1.5">
                   <input
                     type="text"
                     value={phonetic}
                     onChange={(e) => setPhonetic(e.target.value)}
                     placeholder="/ɪˈfem.ər.əl/"
-                    className="w-40 border-b border-gray-300 bg-transparent text-gray-500 focus:border-indigo-400 focus:outline-none"
+                    aria-label="Phonetic"
+                    className="field field-bare ipa w-44"
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleSavePhonetic()}
                   />
-                  <button onClick={handleSavePhonetic} className="text-xs text-indigo-500 hover:underline">Save</button>
+                  <button type="button" onClick={handleSavePhonetic} className="btn btn-ghost btn-sm">Save</button>
                   <button
+                    type="button"
                     onClick={() => { setEditingPhonetic(false); setPhonetic(word.phonetic || ''); }}
-                    className="text-xs text-gray-400 hover:underline"
+                    className="btn btn-ghost btn-sm text-ink-mute"
                   >
                     Cancel
                   </button>
-                </div>
+                </span>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setEditingPhonetic(true)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="ipa -mx-1 inline-flex min-h-11 items-center rounded-sm px-1 transition hover:bg-well hover:text-ink-soft"
                 >
-                  {word.phonetic || '+ Add phonetic'}
+                  {word.phonetic || '+ add phonetic'}
                 </button>
               )}
-              <span className={`rounded-full px-2 py-0.5 text-xs ${
-                word.status === 'captured' ? 'bg-yellow-50 text-yellow-600'
-                : word.status === 'enriched' ? 'bg-green-50 text-green-600'
-                : 'bg-blue-50 text-blue-600'
-              }`}>
-                {word.status}
-              </span>
+              <span className={`pill ${statusTone}`}>{word.status}</span>
             </div>
           </div>
 
-          <button
-            onClick={handleEnrich}
-            disabled={enriching}
-            className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-600 disabled:opacity-50"
-          >
-            {enriching ? 'Loading...' : 'AI Enrich'}
-          </button>
-
-          {primaryDef && (
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide text-gray-400">Add another</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={openHandwritingAdd}
-                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 transition hover:bg-indigo-100"
-                >
-                  + Write
-                </button>
-                <button
-                  onClick={openTypedAdd}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-                >
-                  + Type
-                </button>
-              </div>
+          <div className="space-y-2.5 border-t border-line pt-5">
+            <p className="eyebrow">Add a definition</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => exitGuard.requestExit(openHandwritingAdd)}
+                className="btn btn-primary btn-sm"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                </svg>
+                Write
+              </button>
+              <button
+                type="button"
+                onClick={() => exitGuard.requestExit(openTypedAdd)}
+                className="btn btn-secondary btn-sm"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 7h14M5 12h9M5 17h6" />
+                </svg>
+                Type
+              </button>
             </div>
-          )}
+          </div>
+
+          <div className="space-y-2.5 border-t border-line pt-5">
+            <p className="eyebrow">AI assist</p>
+            <button
+              type="button"
+              onClick={handleEnrich}
+              disabled={enriching}
+              className="btn btn-secondary btn-sm btn-block"
+            >
+              {enriching && (
+                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+                  <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              )}
+              {enriching ? 'Suggesting…' : word.definitions.some(isAiDefinition) ? 'Suggest again' : 'Suggest a definition'}
+            </button>
+            <p className="text-micro leading-relaxed text-ink-mute">
+              Adds a Chinese meaning and one example. Your handwritten cards are never replaced.
+            </p>
+          </div>
         </aside>
 
-        {/* Right main: primary def + editor */}
+        {/* ── Right: the definition itself, then everything else ── */}
         <main className="min-w-0 space-y-4">
           {primaryDef ? (
-            <div>
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-xs font-medium uppercase tracking-wide text-indigo-500">{primaryDef.pos}</span>
+            <article className="card card-raised overflow-hidden">
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="pill pill-brand uppercase tracking-wide">{primaryDef.pos}</span>
+                  {primaryDef.is_primary
+                    ? <span className="pill pill-neutral">Primary</span>
+                    : (
+                      <button
+                        type="button"
+                        onClick={() => void handleSetPrimary(primaryDef)}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        Set as primary
+                      </button>
+                    )}
+                </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={handleEditPrimary}
-                    className="rounded-md px-2 py-1 text-xs text-gray-400 transition hover:bg-gray-50 hover:text-gray-700"
+                    type="button"
+                    onClick={() => exitGuard.requestExit(handleEditPrimary)}
+                    className="btn btn-ghost btn-sm"
                   >
                     Edit
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDeleteDefinition(primaryDef)}
-                    className="rounded-md px-2 py-1 text-xs text-gray-300 transition hover:bg-red-50 hover:text-red-500"
-                    title="Remove"
+                    className="btn btn-danger btn-sm"
                   >
                     Delete
                   </button>
                 </div>
-              </div>
+              </header>
 
-              {isHandwritingPrimary && primaryDef.canvas_image ? (
-                <img
-                  src={primaryDef.canvas_image}
-                  alt={`${word.text} handwritten definition`}
-                  className="mt-3 w-full rounded-xl border border-gray-200 bg-white"
-                />
-              ) : isHandwritingPrimary ? (
-                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-600">
-                  Handwritten source available, preview will be rebuilt on edit.
-                </p>
-              ) : (
-                <div className="mt-3 space-y-2 rounded-xl border border-gray-200 bg-white p-5">
-                  <p className="text-2xl leading-relaxed text-gray-800 lg:text-3xl">{primaryDef.meaning_zh}</p>
-                  {primaryDef.meaning_en && !isAiPrimary && (
-                    <p className="text-base leading-relaxed text-gray-500">{primaryDef.meaning_en}</p>
-                  )}
-                  {primaryDef.examples?.length > 0 && (
-                    <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
-                      {primaryDef.examples.slice(0, 2).map((example) => (
-                        <div key={`${example.order}-${example.sentence_en}`} className="space-y-1">
-                          <p className="text-sm leading-relaxed text-gray-700">{example.sentence_en}</p>
-                          {example.sentence_zh && (
-                            <p className="text-xs leading-relaxed text-gray-400">{example.sentence_zh}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              <div className="px-5 py-5">
+                {isHandwritingPrimary && primaryDef.canvas_image ? (
+                  <img
+                    src={primaryDef.canvas_image}
+                    alt={`${word.text} handwritten definition`}
+                    className="mx-auto w-full max-w-xl rounded-md border border-line bg-surface"
+                  />
+                ) : isHandwritingPrimary ? (
+                  <p className="rounded-md border border-warn/25 bg-warn-wash px-4 py-3 text-micro text-warn">
+                    The handwritten source is stored, but its preview is rebuilt the next time you edit it.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xl leading-snug text-ink">{primaryDef.meaning_zh}</p>
+                    {primaryDef.meaning_en && !isAiPrimary && (
+                      <p className="text-lead leading-relaxed text-ink-mute">{primaryDef.meaning_en}</p>
+                    )}
+                    {primaryDef.examples?.length > 0 && (
+                      <div className="mt-5 space-y-3.5 border-t border-line pt-5">
+                        {primaryDef.examples.slice(0, 2).map((example) => (
+                          <div key={`${example.order}-${example.sentence_en}`} className="space-y-1">
+                            <p className="text-lead leading-relaxed text-ink-soft">{example.sentence_en}</p>
+                            {example.sentence_zh && (
+                              <p className="text-meta leading-relaxed text-ink-mute">{example.sentence_zh}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </article>
           ) : (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-              <p className="text-sm text-gray-500">No definitions yet</p>
-              <div className="mt-4 flex justify-center gap-2">
-                <button
-                  onClick={openHandwritingAdd}
-                  className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-600"
-                >
-                  + Write definition
+            <div className="empty">
+              <span className="grid h-11 w-11 place-items-center rounded-full border border-line-strong bg-surface text-ink-mute">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                </svg>
+              </span>
+              <p className="text-lead font-semibold text-ink">No definition yet</p>
+              <p className="max-w-[38ch] text-meta text-ink-mute">
+                Write it by hand for a card you will recognise, or type it if you are in a hurry.
+              </p>
+              <div className="mt-1 flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={() => exitGuard.requestExit(openHandwritingAdd)} className="btn btn-primary btn-sm">
+                  Write definition
                 </button>
-                <button
-                  onClick={openTypedAdd}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
-                >
-                  + Type definition
+                <button type="button" onClick={() => exitGuard.requestExit(openTypedAdd)} className="btn btn-secondary btn-sm">
+                  Type definition
                 </button>
               </div>
-              <p className="mt-3 text-xs text-gray-400">
-                Or use <button onClick={handleEnrich} className="text-indigo-500 hover:underline">AI Enrich</button> to suggest one.
-              </p>
             </div>
           )}
 
           {/* Inline typed-form editor */}
           {isEditingTyped && (
-            <div ref={typedEditorRef} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-700">{typedEditId ? 'Edit typed definition' : 'New typed definition'}</p>
+            <div ref={typedEditorRef} className="card card-raised p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-display text-title font-semibold text-ink">
+                  {typedEditId ? 'Edit typed definition' : 'New typed definition'}
+                </p>
                 <button
-                  onClick={closeTyped}
-                  className="rounded-md px-2 py-1 text-xs text-gray-400 transition hover:bg-gray-50 hover:text-gray-700"
+                  type="button"
+                  onClick={() => exitGuard.requestExit(closeTyped)}
+                  className="btn btn-ghost btn-sm text-ink-mute"
                 >
                   Cancel
                 </button>
               </div>
               <form
-                className="mt-3 space-y-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void handleSaveTyped();
-                }}
+                className="mt-4 space-y-3.5"
+                onSubmit={(e) => { e.preventDefault(); void handleSaveTyped(); }}
               >
                 <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
-                  <select
-                    value={typedForm.pos}
-                    onChange={(e) => setTypedForm({ ...typedForm, pos: e.target.value })}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                  >
-                    {POS_OPTIONS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={typedForm.meaning_en}
-                    onChange={(e) => setTypedForm({ ...typedForm, meaning_en: e.target.value })}
-                    placeholder="English meaning or note"
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                  <div>
+                    <label className="label" htmlFor="detail-pos">Part of speech</label>
+                    <select
+                      id="detail-pos"
+                      value={typedForm.pos}
+                      onChange={(e) => setTypedForm({ ...typedForm, pos: e.target.value })}
+                      className="field"
+                    >
+                      {POS_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="detail-meaning-en">
+                      English note <span className="font-normal text-ink-mute">optional</span>
+                    </label>
+                    <input
+                      id="detail-meaning-en"
+                      type="text"
+                      value={typedForm.meaning_en}
+                      onChange={(e) => setTypedForm({ ...typedForm, meaning_en: e.target.value })}
+                      placeholder="A gloss in your own words"
+                      className="field"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="label" htmlFor="detail-meaning-zh">Meaning</label>
+                  <textarea
+                    id="detail-meaning-zh"
+                    value={typedForm.meaning_zh}
+                    onChange={(e) => setTypedForm({ ...typedForm, meaning_zh: e.target.value })}
+                    placeholder="中文释义"
+                    rows={3}
+                    autoFocus
+                    className="field"
                   />
                 </div>
-                <textarea
-                  value={typedForm.meaning_zh}
-                  onChange={(e) => setTypedForm({ ...typedForm, meaning_zh: e.target.value })}
-                  placeholder="中文释义"
-                  rows={3}
-                  autoFocus
-                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm leading-6 focus:border-indigo-400 focus:outline-none"
-                />
                 <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={!typedForm.meaning_zh.trim() || savingTyped}
-                    className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-600 disabled:opacity-40"
+                    className="btn btn-primary"
                   >
-                    {savingTyped ? 'Saving...' : typedEditId ? 'Update' : 'Save'}
+                    {savingTyped ? 'Saving…' : typedEditId ? 'Update definition' : 'Save definition'}
                   </button>
                 </div>
               </form>
             </div>
           )}
 
-          {/* Tab strip for other definitions */}
+          {/* Other definitions */}
           {showTabStrip && (
-            <div className="border-t border-gray-100 pt-3">
-              <p className="mb-2 text-xs uppercase tracking-wide text-gray-400">
-                {otherDefs.length} more
-              </p>
-              <div className="flex flex-wrap gap-2">
+            <section className="border-t border-line pt-5">
+              <p className="eyebrow mb-3">{otherDefs.length} more {otherDefs.length === 1 ? 'definition' : 'definitions'}</p>
+              <ul className="grid gap-2.5 sm:grid-cols-2">
                 {otherDefs.map((def) => (
-                  <button
-                    key={def.id}
-                    onClick={() => handleSelectDef(def.id)}
-                    className="group flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-left transition hover:border-indigo-300 hover:bg-indigo-50"
-                  >
-                    {isHandwritingDef(def) && def.canvas_image ? (
-                      <img
-                        src={def.canvas_image}
-                        alt=""
-                        className="h-10 w-8 rounded border border-gray-100 object-cover"
-                      />
+                  <li key={def.id} className="card card-interactive flex items-center gap-3 p-2.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDef(def.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      {/* The tile marks the medium; the pill below already prints the
+                          part of speech, so repeating it here was pure noise. */}
+                      {isHandwritingDef(def) && def.canvas_image ? (
+                        <img src={def.canvas_image} alt="" className="h-12 w-10 shrink-0 rounded-sm border border-line object-cover" />
+                      ) : (
+                        <span
+                          className="grid h-12 w-10 shrink-0 place-items-center rounded-sm border border-line bg-well text-ink-mute"
+                          title={isHandwritingDef(def) ? 'Handwritten' : 'Typed'}
+                        >
+                          {isHandwritingDef(def) ? (
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                            </svg>
+                          ) : (
+                            <span className="text-micro font-semibold">T</span>
+                          )}
+                        </span>
+                      )}
+                      <span className="flex min-w-0 flex-col">
+                        <span className="pill pill-neutral mb-1 w-fit">{def.pos}</span>
+                        <span className="truncate text-meta text-ink-soft">{definitionLabel(def)}</span>
+                      </span>
+                    </button>
+                    {def.is_primary ? (
+                      <span className="pill pill-brand shrink-0">Primary</span>
                     ) : (
-                      <span className="grid h-10 w-8 place-items-center rounded border border-gray-100 bg-gray-50 text-[10px] font-medium text-gray-400">
-                        T
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void handleSetPrimary(def)}
+                        className="btn btn-ghost btn-sm shrink-0"
+                      >
+                        Pin
+                      </button>
                     )}
-                    <span className="flex flex-col text-xs">
-                      <span className="font-medium text-gray-500">{def.pos}</span>
-                      <span className="max-w-[8rem] truncate text-gray-700 group-hover:text-indigo-700">
-                        {definitionLabel(def)}
-                      </span>
-                    </span>
-                  </button>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
         </main>
       </div>
@@ -565,7 +730,8 @@ export default function WordDetailPage() {
         resetKey={`${word.id}-${fullscreenEditId ?? 'new'}-fs`}
         saving={savingHandwriting}
         onSave={handleSaveHandwriting}
-        onCancel={closeHandwriting}
+        onCancel={() => exitGuard.requestExit(closeHandwriting)}
+        onDraftChange={onDraftChange}
       />
     </div>
   );

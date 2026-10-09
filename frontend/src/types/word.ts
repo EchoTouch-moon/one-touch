@@ -21,6 +21,7 @@ export interface Definition {
   canvas_image: string | null;
   ink_data: string | null;
   order: number;
+  is_primary: boolean;
   examples: Example[];
 }
 

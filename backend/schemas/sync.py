@@ -21,6 +21,10 @@ class SyncDefinition(BaseModel):
     pos: str = Field("unknown", max_length=32)
     meaning_en: str = Field("", max_length=500)
     meaning_zh: str = Field("", max_length=500)
+    canvas_image: str | None = None
+    ink_data: str | None = None
+    order: int = Field(0, ge=0, le=10000)
+    is_primary: bool = False
     examples: list[SyncExample] = Field(default_factory=list, max_length=8)
     collocations: list[SyncCollocation] = Field(default_factory=list, max_length=8)
 
@@ -43,7 +47,7 @@ class SyncReviewRecord(BaseModel):
 
 
 class SyncWord(BaseModel):
-    text: str = Field(..., min_length=1, max_length=128)
+    text: str = Field(..., pattern=r"^[A-Za-z][A-Za-z'\- ]{0,127}$")
     phonetic: str | None = Field(None, max_length=128)
     status: str = Field("captured", max_length=20)
     created_at: datetime | None = None
@@ -53,7 +57,10 @@ class SyncWord(BaseModel):
 
 class SyncPayload(BaseModel):
     version: str = Field("1.0", max_length=16)
+    export_version: str = Field("2.0", max_length=16)
     exported_at: datetime | None = None
+    app_version: str = Field("", max_length=64)
+    review_algorithm: str = Field("sm2", max_length=32)
     words: list[SyncWord] = Field(default_factory=list, max_length=5000)
 
 

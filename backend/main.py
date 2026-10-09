@@ -5,14 +5,15 @@ from contextlib import asynccontextmanager, suppress
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from backend.auth import require_auth
+from backend.auth import decode_token_if_valid, ensure_account_active, require_auth
 from backend.config import AppConfig
 from backend.database import Base, create_engine_and_session
-from backend.security import LoginRateLimiter, validate_production_secrets
+from backend.security import IpRateLimiter, LoginRateLimiter, validate_production_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +49,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from backend.models import Word, Definition, ExampleSentence, Collocation, ReviewRecord, ReviewLog, User, InviteCode, EmailVerification  # noqa: F401
-        from backend.services import user_service
+        from backend.models import AiEnrichUsage  # noqa: F401
+        from backend.models.kaoyan import ExamSentence, KaoyanWord  # noqa: F401
+        from backend.services import kaoyan_service, user_service
         from backend.services.backup_service import backup_loop, prune_old_backups, run_sqlite_backup
         from backend.passwords import hash_password
-        from backend.models import AiEnrichUsage  # noqa: F401
+        from sqlalchemy import select as sa_select
 
         db_path = Path.home() / ".glm-words"
         db_path.mkdir(parents=True, exist_ok=True)
@@ -69,6 +72,28 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
                 )
                 logger.info("Migrated: added user_id column to words table")
 
+            def word_indexes(sync_conn):
+                indexes = []
+                for row in sync_conn.execute(text("PRAGMA index_list(words)")):
+                    index_name = row[1]
+                    escaped_name = index_name.replace('"', '""')
+                    columns = [
+                        info[2]
+                        for info in sync_conn.execute(text(f'PRAGMA index_info("{escaped_name}")'))
+                    ]
+                    indexes.append((index_name, bool(row[2]), columns))
+                return indexes
+
+            for index_name, is_unique, index_columns in await conn.run_sync(word_indexes):
+                if is_unique and index_columns == ["text"] and not index_name.startswith("sqlite_autoindex"):
+                    escaped_name = index_name.replace('"', '""')
+                    await conn.execute(text(f'DROP INDEX "{escaped_name}"'))
+                    logger.info("Migrated: dropped global unique index %s on words.text", index_name)
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_words_text ON words(text)"))
+            await conn.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_words_user_text_unique ON words(user_id, text)")
+            )
+
             definition_columns = await conn.run_sync(
                 lambda sync_conn: [row[1] for row in sync_conn.execute(text("PRAGMA table_info(definitions)"))]
             )
@@ -78,6 +103,32 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             if "ink_data" not in definition_columns:
                 await conn.execute(text("ALTER TABLE definitions ADD COLUMN ink_data TEXT"))
                 logger.info("Migrated: added ink_data column to definitions table")
+            if "is_primary" not in definition_columns:
+                await conn.execute(text("ALTER TABLE definitions ADD COLUMN is_primary BOOLEAN NOT NULL DEFAULT 0"))
+                await conn.execute(
+                    text(
+                        """
+                        UPDATE definitions
+                        SET is_primary = 1
+                        WHERE id IN (
+                            SELECT MIN(id)
+                            FROM definitions
+                            GROUP BY word_id
+                        )
+                        """
+                    )
+                )
+                logger.info("Migrated: added is_primary column to definitions table")
+
+            user_columns = await conn.run_sync(
+                lambda sync_conn: [row[1] for row in sync_conn.execute(text("PRAGMA table_info(users)"))]
+            )
+            if user_columns and "is_disabled" not in user_columns:
+                await conn.execute(text("ALTER TABLE users ADD COLUMN is_disabled BOOLEAN NOT NULL DEFAULT 0"))
+                logger.info("Migrated: added is_disabled column to users table")
+            if user_columns and "credentials_updated_at" not in user_columns:
+                await conn.execute(text("ALTER TABLE users ADD COLUMN credentials_updated_at DATETIME"))
+                logger.info("Migrated: added credentials_updated_at column to users table")
 
             review_columns = await conn.run_sync(
                 lambda sync_conn: [row[1] for row in sync_conn.execute(text("PRAGMA table_info(review_records)"))]
@@ -114,6 +165,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             if verification_columns and "purpose" not in verification_columns:
                 await conn.execute(text("ALTER TABLE email_verifications ADD COLUMN purpose VARCHAR(32) NOT NULL DEFAULT 'register'"))
                 logger.info("Migrated: added purpose column to email_verifications table")
+            exam_sentence_columns = await conn.run_sync(
+                lambda sync_conn: [row[1] for row in sync_conn.execute(text("PRAGMA table_info(exam_sentences)"))]
+            )
+            if exam_sentence_columns and "exam_type" not in exam_sentence_columns:
+                await conn.execute(text("ALTER TABLE exam_sentences ADD COLUMN exam_type VARCHAR(8) NOT NULL DEFAULT '英语一'"))
+                logger.info("Migrated: added exam_type column to exam_sentences table")
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_email_verifications_email ON email_verifications(email)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_email_verifications_email_purpose ON email_verifications(email, purpose)"))
 
@@ -125,7 +182,17 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             orphan_count = await user_service.assign_orphan_words(db, admin.id)
             if orphan_count > 0:
                 logger.info("Assigned %d orphan words to admin user", orphan_count)
+
+            kaoyan_dir = Path(__file__).resolve().parent.parent / "data" / "kaoyan"
+            word_count, sentence_count = await kaoyan_service.seed_if_empty(db, kaoyan_dir)
             await db.commit()
+            if word_count:
+                logger.info("Kaoyan lexicon ready: %d words, %d exam sentences", word_count, sentence_count)
+
+            sentences = list((await db.execute(sa_select(ExamSentence))).scalars().all())
+            kaoyan_index = kaoyan_service.build_inverted_index(sentences)
+            app.state.kaoyan_index = kaoyan_index
+            logger.info("Kaoyan inverted index: %d words mapped to sentences", len(kaoyan_index))
 
         backup_task = None
         if config.ops.backup_enabled:
@@ -150,6 +217,22 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.state.session_maker = session_maker
     app.state.config = config
     app.state.login_rate_limiter = LoginRateLimiter()
+    app.state.send_code_limiter = IpRateLimiter(max_attempts=5, window_seconds=3600)
+    app.state.code_verify_limiter = IpRateLimiter(max_attempts=10, window_seconds=600)
+
+    @app.middleware("http")
+    async def account_state_middleware(request: Request, call_next):
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            payload = decode_token_if_valid(token, config)
+            if payload is not None and "sub" in payload:
+                async with session_maker() as db:
+                    try:
+                        await ensure_account_active(db, payload)
+                    except HTTPException as exc:
+                        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        return await call_next(request)
 
     if config.allowed_origins:
         app.add_middleware(
@@ -186,10 +269,11 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         )
         return response
 
-    from backend.routers import auth, words, review, enrich, sync, profile, ops
+    from backend.routers import auth, words, review, enrich, sync, profile, ops, kaoyan
 
     app.include_router(auth.router, prefix="/api")
     app.include_router(ops.router, prefix="/api")
+    app.include_router(kaoyan.router, prefix="/api", dependencies=[Depends(require_auth)])
     app.include_router(words.router, prefix="/api", dependencies=[Depends(require_auth)])
     app.include_router(review.router, prefix="/api", dependencies=[Depends(require_auth)])
     app.include_router(enrich.router, prefix="/api", dependencies=[Depends(require_auth)])

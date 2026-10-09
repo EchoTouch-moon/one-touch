@@ -20,26 +20,25 @@ export default function UpdatePrompt() {
   if (!activate) return null;
 
   return (
-    <div className="fixed inset-x-3 bottom-20 z-50 rounded-xl border border-gray-200 bg-white p-3 shadow-xl sm:bottom-4 sm:left-auto sm:right-4 sm:w-80">
-      <p className="text-sm font-medium text-gray-900">A new version is ready</p>
-      <p className="mt-1 text-xs text-gray-400">Update now to use the latest build.</p>
-      <div className="mt-3 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setActivate(null)}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800"
-        >
+    <div
+      role="status"
+      className="card card-float fixed inset-x-3 bottom-[calc(var(--shell-bottom)+0.75rem)] z-50 p-4 sm:inset-x-auto sm:right-4 sm:w-80"
+    >
+      <p className="flex items-center gap-2 text-meta font-semibold text-ink">
+        <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
+        A new version is ready
+      </p>
+      <p className="mt-1.5 text-micro leading-relaxed text-ink-mute">
+        Reload to pick up the latest build. Your drafts stay on this device.
+      </p>
+      <div className="mt-3.5 flex justify-end gap-2">
+        <button type="button" onClick={() => setActivate(null)} className="btn btn-ghost btn-sm">
           Later
         </button>
-        <button
-          type="button"
-          onClick={activate}
-          className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
-        >
-          Update
+        <button type="button" onClick={activate} className="btn btn-primary btn-sm">
+          Reload now
         </button>
       </div>
     </div>
   );
 }
-

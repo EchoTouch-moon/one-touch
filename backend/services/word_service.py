@@ -10,6 +10,10 @@ from backend.models.example import ExampleSentence
 from backend.models.word import Word
 
 
+class WordAlreadyExistsError(ValueError):
+    pass
+
+
 def _scope(query, user_id: Optional[int], role: Optional[str]):
     if role != "admin" and user_id is not None:
         return query.where(Word.user_id == user_id)
@@ -18,6 +22,15 @@ def _scope(query, user_id: Optional[int], role: Optional[str]):
 
 async def create_word(session: AsyncSession, text: str, *, user_id: Optional[int] = None) -> Word:
     text = text.strip().lower()
+    existing_query = select(Word.id).where(Word.text == text)
+    if user_id is None:
+        existing_query = existing_query.where(Word.user_id.is_(None))
+    else:
+        existing_query = existing_query.where(Word.user_id == user_id)
+    existing = await session.execute(existing_query)
+    if existing.scalar_one_or_none() is not None:
+        raise WordAlreadyExistsError(f"Word '{text}' already exists")
+
     word = Word(text=text, status="captured", user_id=user_id)
     session.add(word)
     await session.flush()
@@ -113,6 +126,15 @@ async def search_words(
     return words, total
 
 
+async def get_word_by_text(
+    session: AsyncSession, text: str, *, user_id: Optional[int] = None
+) -> Word | None:
+    result = await session.execute(
+        select(Word).where(Word.text == text.strip().lower(), Word.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def suggest_words(
     session: AsyncSession, prefix: str, limit: int = 8, *, user_id: Optional[int] = None, role: Optional[str] = None
 ) -> list[str]:
@@ -154,11 +176,19 @@ async def add_definition(
     ink_data: str | None = None,
     examples: list[dict] | None = None,
     collocations: list[dict] | None = None,
+    is_primary: bool | None = None,
 ) -> Definition:
     result = await session.execute(
         select(func.count()).select_from(Definition).where(Definition.word_id == word_id)
     )
     order = result.scalar() or 0
+    should_be_primary = is_primary if is_primary is not None else order == 0
+    if should_be_primary:
+        existing_primary = await session.execute(
+            select(Definition).where(Definition.word_id == word_id, Definition.is_primary.is_(True))
+        )
+        for existing in existing_primary.scalars().all():
+            existing.is_primary = False
     definition = Definition(
         word_id=word_id,
         pos=pos,
@@ -167,6 +197,7 @@ async def add_definition(
         canvas_image=canvas_image,
         ink_data=ink_data,
         order=order,
+        is_primary=should_be_primary,
     )
     session.add(definition)
     await session.flush()
@@ -216,14 +247,33 @@ async def update_definition(
         definition.canvas_image = values["canvas_image"]
     if "ink_data" in values:
         definition.ink_data = values["ink_data"]
+    if values.get("is_primary") is True:
+        existing_primary = await session.execute(
+            select(Definition).where(Definition.word_id == word_id, Definition.is_primary.is_(True))
+        )
+        for existing in existing_primary.scalars().all():
+            if existing.id != definition.id:
+                existing.is_primary = False
+        definition.is_primary = True
+    elif values.get("is_primary") is False:
+        definition.is_primary = False
 
     await session.flush()
     await session.refresh(definition)
     return definition
 
 
-async def update_word(session: AsyncSession, word_id: int, phonetic: str | None = None) -> Word:
-    word = await session.get(Word, word_id)
+async def update_word(
+    session: AsyncSession,
+    word_id: int,
+    phonetic: str | None = None,
+    *,
+    user_id: Optional[int] = None,
+    role: Optional[str] = None,
+) -> Word:
+    query = _scope(select(Word).where(Word.id == word_id), user_id, role)
+    result = await session.execute(query)
+    word = result.scalar_one_or_none()
     if word is None:
         raise ValueError(f"Word {word_id} not found")
     if phonetic is not None:
@@ -233,16 +283,38 @@ async def update_word(session: AsyncSession, word_id: int, phonetic: str | None 
     return word
 
 
-async def delete_definition(session: AsyncSession, definition_id: int) -> bool:
-    defn = await session.get(Definition, definition_id)
+async def delete_definition(
+    session: AsyncSession,
+    word_id: int,
+    definition_id: int,
+    *,
+    user_id: Optional[int] = None,
+    role: Optional[str] = None,
+) -> bool:
+    query = (
+        select(Definition)
+        .join(Word, Definition.word_id == Word.id)
+        .where(Definition.id == definition_id, Definition.word_id == word_id)
+    )
+    query = _scope(query, user_id, role)
+    result = await session.execute(query)
+    defn = result.scalar_one_or_none()
     if defn is None:
         return False
     await session.delete(defn)
     return True
 
 
-async def delete_word(session: AsyncSession, word_id: int) -> bool:
-    word = await session.get(Word, word_id)
+async def delete_word(
+    session: AsyncSession,
+    word_id: int,
+    *,
+    user_id: Optional[int] = None,
+    role: Optional[str] = None,
+) -> bool:
+    query = _scope(select(Word).where(Word.id == word_id), user_id, role)
+    result = await session.execute(query)
+    word = result.scalar_one_or_none()
     if word is None:
         return False
     await session.delete(word)

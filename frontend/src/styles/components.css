@@ -1,0 +1,469 @@
+/* ── Components ──────────────────────────────────────────────────────────────
+   The vocabulary every route is built from. Pages compose these with layout
+   utilities instead of re-deriving their own buttons, fields and cards, which
+   is what keeps spacing, radius, depth and motion identical across the app.
+
+   Declared in the `components` layer so plain utilities (`mt-6`, `w-full`)
+   still win when a page needs to override something.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@layer components {
+  /* ── app canvas ───────────────────────────────────────────────────────── */
+  .app-canvas {
+    background-color: var(--color-paper);
+    background-image:
+      radial-gradient(1100px 520px at 50% -14%,
+        color-mix(in srgb, var(--color-brand) var(--t-canvas-brand), var(--color-paper)),
+        var(--color-paper) 62%),
+      radial-gradient(900px 480px at 106% 108%,
+        color-mix(in srgb, var(--color-accent) var(--t-canvas-accent), var(--color-paper)),
+        var(--color-paper) 58%);
+  }
+
+  /* ── page frame ───────────────────────────────────────────────────────── */
+  .page {
+    width: 100%;
+    max-width: var(--container-page);
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+    padding-block: 1.75rem 2.5rem;
+  }
+  @media (min-width: 640px) {
+    .page { padding-inline: 1.75rem; padding-block: 2.5rem 3.5rem; }
+  }
+
+  .page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .page-head-text { min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-size: var(--text-display-sm);
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .page-lede {
+    color: var(--color-ink-mute);
+    font-size: var(--text-meta);
+    max-width: 52ch;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-eyebrow);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-ink-mute);
+  }
+
+  /* ── surfaces ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-hair);
+  }
+  .card-raised { box-shadow: var(--shadow-card); }
+  .card-float { box-shadow: var(--shadow-float); }
+  .card-quiet { background: var(--color-surface-2); }
+  .card-flush { border-radius: 0; border-inline: 0; }
+
+  .card-interactive {
+    transition:
+      transform var(--dur-base) var(--ease-out-expo),
+      box-shadow var(--dur-base) var(--ease-out-expo),
+      border-color var(--dur-quick) ease,
+      background-color var(--dur-quick) ease;
+  }
+  @media (hover: hover) {
+    .card-interactive:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lift);
+      border-color: var(--color-line-strong);
+    }
+  }
+
+  .well {
+    background: var(--color-well);
+    border-radius: var(--radius-md);
+  }
+
+  .rule { border-top: 1px solid var(--color-line); }
+
+  /* ── buttons ──────────────────────────────────────────────────────────── */
+  .btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    font-size: var(--text-meta);
+    font-weight: 600;
+    letter-spacing: -0.004em;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--dur-quick) ease,
+      border-color var(--dur-quick) ease,
+      color var(--dur-quick) ease,
+      box-shadow var(--dur-quick) var(--ease-out-expo),
+      transform var(--dur-tap) var(--ease-out-expo);
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+
+  /* At rest, an empty form leaves the primary action disabled — and at 1440px
+     that button is the single largest object on the screen. Fading a near-black
+     fill to 42% turns it into a grey slab that reads as a rendering fault, so a
+     disabled primary becomes a quiet well instead and the input keeps focus. */
+  .btn-primary:disabled,
+  .btn-primary[aria-disabled="true"] {
+    background: var(--color-well);
+    border-color: var(--color-line);
+    color: var(--color-ink-mute);
+    box-shadow: none;
+    opacity: 1;
+  }
+  .btn:not(:disabled):active { transform: translateY(1px) scale(0.985); }
+
+  .btn-primary {
+    background: var(--color-ink);
+    color: #f7f4ee;
+    box-shadow: var(--shadow-hair);
+  }
+  @media (hover: hover) {
+    .btn-primary:not(:disabled):hover {
+      background: #2b261b;
+      box-shadow: var(--shadow-card);
+      transform: translateY(-1px);
+    }
+    .btn-primary:not(:disabled):active { transform: translateY(0) scale(0.985); }
+  }
+
+  .btn-secondary {
+    background: var(--color-surface);
+    border-color: var(--color-line-strong);
+    color: var(--color-ink-soft);
+    box-shadow: var(--shadow-hair);
+  }
+  @media (hover: hover) {
+    .btn-secondary:not(:disabled):hover {
+      background: var(--color-surface);
+      border-color: var(--color-ink-faint);
+      color: var(--color-ink);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-card);
+    }
+  }
+
+  .btn-brand {
+    background: var(--color-brand);
+    color: #fff;
+    box-shadow: var(--shadow-hair);
+  }
+  @media (hover: hover) {
+    .btn-brand:not(:disabled):hover { background: var(--color-brand-deep); box-shadow: var(--shadow-card); transform: translateY(-1px); }
+  }
+
+  .btn-ghost { color: var(--color-ink-soft); }
+  @media (hover: hover) {
+    .btn-ghost:not(:disabled):hover { background: var(--color-well); color: var(--color-ink); }
+  }
+
+  .btn-danger { color: var(--color-bad); }
+  @media (hover: hover) {
+    .btn-danger:not(:disabled):hover { background: var(--color-bad-wash); }
+  }
+
+  .btn-sm { min-height: 2.5rem; padding: 0.4rem 0.75rem; font-size: var(--text-micro); border-radius: var(--radius-sm); }
+  /* A 40px control is fine under a pointer and too small under a thumb. */
+  @media (pointer: coarse) {
+    .btn-sm { min-height: 2.75rem; }
+  }
+  .btn-lg { min-height: 3.25rem; padding: 0.95rem 1.5rem; font-size: var(--text-body); border-radius: var(--radius-lg); }
+  /* Block-level, not inline-flex: auto margins are ignored on inline-level
+     boxes, so `mx-auto max-w-*` on a full-width button silently left-aligned it. */
+  .btn-block { display: flex; width: 100%; }
+
+  .btn-icon {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0;
+    border-radius: var(--radius-md);
+  }
+
+  /* ── fields ───────────────────────────────────────────────────────────── */
+  .field {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.6rem 0.85rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-md);
+    color: var(--color-ink);
+    font-size: var(--text-body);
+    box-shadow: var(--shadow-hair);
+    transition:
+      border-color var(--dur-quick) ease,
+      box-shadow var(--dur-quick) var(--ease-out-expo),
+      background-color var(--dur-quick) ease;
+  }
+  .field:hover:not(:focus) { border-color: var(--color-ink-faint); }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px rgba(75, 68, 214, 0.14), var(--shadow-hair);
+  }
+  textarea.field { resize: vertical; min-height: 6rem; line-height: 1.6; }
+  select.field { appearance: none; padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b6459' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+    background-size: 1rem;
+  }
+
+  /* Hero field: the one input the product is named after. */
+  .field-hero {
+    min-height: 4.25rem;
+    padding-inline: 1.5rem;
+    background: var(--color-surface);
+    border: 1.5px solid var(--color-line-strong);
+    border-radius: var(--radius-xl);
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-size: 1.75rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    text-align: center;
+    box-shadow: var(--shadow-card);
+  }
+  .field-hero::placeholder { font-weight: 400; letter-spacing: -0.01em; }
+
+  .field-bare {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--color-line-strong);
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0.15rem 0.1rem;
+    min-height: 2rem;
+  }
+  .field-bare:focus { border-bottom-color: var(--color-brand); box-shadow: none; }
+
+  .label {
+    display: block;
+    font-size: var(--text-micro);
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    margin-bottom: 0.4rem;
+  }
+
+  /* ── pills & badges ───────────────────────────────────────────────────── */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: var(--text-micro);
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .pill-neutral { background: var(--color-well); color: var(--color-ink-soft); }
+  .pill-line { border-color: var(--color-line-strong); color: var(--color-ink-mute); }
+  .pill-brand { background: var(--color-brand-wash); color: var(--color-brand-deep); }
+  .pill-accent { background: var(--color-accent-wash); color: var(--color-accent); }
+  .pill-good { background: var(--color-good-wash); color: var(--color-good); }
+  .pill-warn { background: var(--color-warn-wash); color: var(--color-warn); }
+  .pill-bad { background: var(--color-bad-wash); color: var(--color-bad); }
+
+  /* ── inline text bits ─────────────────────────────────────────────────── */
+  .ipa {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: -0.01em;
+    color: var(--color-ink-mute);
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .link {
+    color: var(--color-brand-deep);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--color-brand) 34%, transparent);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-color var(--dur-quick) ease, color var(--dur-quick) ease;
+  }
+  .link:hover { text-decoration-color: currentColor; }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.35rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--color-line-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-xs);
+    background: var(--color-surface);
+    color: var(--color-ink-mute);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* ── the word ─────────────────────────────────────────────────────────── */
+  .word {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 0.98;
+    overflow-wrap: anywhere;
+  }
+
+  /* ── stats ────────────────────────────────────────────────────────────── */
+  .stat-value {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--color-ink);
+  }
+  .stat-label {
+    font-size: var(--text-micro);
+    color: var(--color-ink-mute);
+    line-height: 1.4;
+  }
+
+  /* ── empty state ──────────────────────────────────────────────────────── */
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2.75rem 1.5rem;
+    border: 1px dashed var(--color-line-strong);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+    text-align: center;
+  }
+
+  /* ── loading ──────────────────────────────────────────────────────────── */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-paper-deep);
+    border-radius: var(--radius-sm);
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 253, 249, 0.75), transparent);
+    animation: skeleton-sweep 1.4s var(--ease-in-out-soft) infinite;
+  }
+  @keyframes skeleton-sweep {
+    100% { transform: translateX(100%); }
+  }
+
+  /* ── shell navigation ─────────────────────────────────────────────────── */
+  .navlink {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 2.75rem;
+    font-size: var(--text-meta);
+    font-weight: 500;
+    color: var(--color-ink-mute);
+    transition: color var(--dur-quick) ease;
+  }
+  .navlink::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0.55rem;
+    height: 1.5px;
+    border-radius: 999px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--dur-base) var(--ease-out-expo);
+  }
+  .navlink:hover { color: var(--color-ink); }
+  .navlink:hover::after { transform: scaleX(1); }
+  .navlink[aria-current="page"] { color: var(--color-ink); font-weight: 600; }
+  .navlink[aria-current="page"]::after { transform: scaleX(1); background: var(--color-brand); }
+
+  /* ── progress ─────────────────────────────────────────────────────────── */
+  .track {
+    height: 0.4rem;
+    border-radius: 999px;
+    /* paper-deep on paper is ~1.06:1 — it read as a smudge, not a progress bar */
+    background: color-mix(in srgb, var(--color-ink) 12%, var(--color-paper));
+    overflow: hidden;
+  }
+  .track-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-brand) 0%, #7b6ff0 100%);
+  }
+}
+
+/* A single global micro-interaction for every button in the product, so
+   nothing feels inert even before it gets a bespoke treatment. */
+@layer base {
+  button:not(:disabled) {
+    transition:
+      background-color var(--dur-quick) ease,
+      border-color var(--dur-quick) ease,
+      color var(--dur-quick) ease,
+      box-shadow var(--dur-quick) var(--ease-out-expo),
+      transform var(--dur-tap) var(--ease-out-expo),
+      opacity var(--dur-quick) ease;
+  }
+  button:not(:disabled):active { transform: scale(0.97); }
+}
+
+@layer utilities {
+  /* "Enter to capture" and "press 1–4" are noise on a phone; the reverse is true
+     for touch-only affordances. Two media-query utilities beat scattering
+     pointer checks through the page components. */
+  @media (hover: none), (pointer: coarse) {
+    .hover-only { display: none !important; }
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .touch-only { display: none !important; }
+  }
+}

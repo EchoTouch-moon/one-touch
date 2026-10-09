@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 
@@ -6,10 +7,12 @@ from pydantic import BaseModel
 
 from backend.auth import create_auth_token, get_current_user, require_auth, verify_admin_credentials
 from backend.config import AppConfig
-from backend.passwords import hash_password, verify_password
+from backend.passwords import MAX_PASSWORD_BYTES, hash_password, verify_password
 from backend.services import mail_service, user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+logger = logging.getLogger(__name__)
 
 
 class LoginRequest(BaseModel):
@@ -38,7 +41,24 @@ class CreateUserRequest(BaseModel):
     password: str
 
 
+class UpdateUserRequest(BaseModel):
+    is_disabled: bool
+
+
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def validate_password_length(password: str, min_length: int = 10) -> None:
+    if len(password) < min_length:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Password must be at least {min_length} characters.",
+        )
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Password must be at most {MAX_PASSWORD_BYTES} bytes (utf-8).",
+        )
 
 
 @router.post("/login")
@@ -59,17 +79,21 @@ async def login(body: LoginRequest, request: Request):
                 )
                 await db.commit()
             token = create_auth_token(admin.id, "admin", config)
-        return {"token": token, "username": admin.email, "role": "admin"}
+        return {"token": token, "username": admin.email, "user_id": admin.id, "role": "admin"}
 
     async with session_maker() as db:
         user = await user_service.get_user_by_email(db, body.username.strip().lower())
         if user is None or not verify_password(body.password, user.password_hash):
             limiter.record_failure(request, body.username)
+            logger.info("login_failed identifier=%r", body.username.strip().lower())
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        if user.is_disabled:
+            limiter.record_failure(request, body.username)
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is disabled.")
 
         limiter.reset(request, body.username)
         token = create_auth_token(user.id, user.role, config)
-        return {"token": token, "username": user.email, "role": user.role}
+        return {"token": token, "username": user.email, "user_id": user.id, "role": user.role}
 
 
 @router.post("/register")
@@ -77,8 +101,12 @@ async def register(body: RegisterRequest, request: Request):
     config: AppConfig = request.app.state.config
     registration = config.registration
     session_maker = request.app.state.session_maker
+    verify_limiter = request.app.state.code_verify_limiter
 
     email = body.email.strip().lower()
+    validate_password_length(body.password)
+
+    verify_limiter.check(request)
 
     if not registration.enabled:
         raise HTTPException(
@@ -87,11 +115,6 @@ async def register(body: RegisterRequest, request: Request):
         )
     if not EMAIL_RE.fullmatch(email):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a valid email address.")
-    if len(body.password) < 10:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 10 characters.",
-        )
 
     async with session_maker() as db:
         existing = await user_service.get_user_by_email(db, email)
@@ -105,10 +128,11 @@ async def register(body: RegisterRequest, request: Request):
 
         verified = await user_service.verify_email_code(db, email, body.verification_code, config.auth_secret, "register")
         if not verified:
+            verify_limiter.record(request)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired verification code.")
 
         pw_hash = hash_password(body.password)
-        user = await user_service.create_user(db, email, pw_hash, role="user")
+        await user_service.create_user(db, email, pw_hash, role="user")
         await db.commit()
 
     return {"accepted": True, "message": "Account created. You can now sign in."}
@@ -119,7 +143,10 @@ async def send_registration_code(body: SendVerificationRequest, request: Request
     config: AppConfig = request.app.state.config
     registration = config.registration
     session_maker = request.app.state.session_maker
+    send_limiter = request.app.state.send_code_limiter
     email = body.email.strip().lower()
+
+    send_limiter.check(request)
 
     if not registration.enabled:
         raise HTTPException(
@@ -138,6 +165,7 @@ async def send_registration_code(body: SendVerificationRequest, request: Request
             if user_count >= registration.max_users:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Beta registration is full.")
 
+        send_limiter.record(request)
         code = f"{secrets.randbelow(1_000_000):06d}"
         await user_service.create_email_verification(
             db,
@@ -162,7 +190,10 @@ async def send_password_reset_code(body: SendVerificationRequest, request: Reque
     config: AppConfig = request.app.state.config
     registration = config.registration
     session_maker = request.app.state.session_maker
+    send_limiter = request.app.state.send_code_limiter
     email = body.email.strip().lower()
+
+    send_limiter.check(request)
 
     if not EMAIL_RE.fullmatch(email):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a valid email address.")
@@ -172,6 +203,7 @@ async def send_password_reset_code(body: SendVerificationRequest, request: Reque
     async with session_maker() as db:
         existing = await user_service.get_user_by_email(db, email)
         if existing is not None:
+            send_limiter.record(request)
             await user_service.create_email_verification(
                 db,
                 email,
@@ -196,20 +228,20 @@ async def send_password_reset_code(body: SendVerificationRequest, request: Reque
 async def reset_password(body: ResetPasswordRequest, request: Request):
     config: AppConfig = request.app.state.config
     session_maker = request.app.state.session_maker
+    verify_limiter = request.app.state.code_verify_limiter
     email = body.email.strip().lower()
+    validate_password_length(body.password)
+
+    verify_limiter.check(request)
 
     if not EMAIL_RE.fullmatch(email):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a valid email address.")
-    if len(body.password) < 10:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 10 characters.",
-        )
 
     async with session_maker() as db:
         user = await user_service.get_user_by_email(db, email)
         verified = await user_service.verify_email_code(db, email, body.verification_code, config.auth_secret, "reset_password")
         if user is None or not verified:
+            verify_limiter.record(request)
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired verification code.")
 
         await user_service.update_user_password(db, user, hash_password(body.password))
@@ -252,10 +284,16 @@ async def get_auth_status(request: Request):
     except HTTPException:
         payload = None
 
+    user = None
+    if payload:
+        from backend.models.user import User
+        async with request.app.state.session_maker() as db:
+            user = await db.get(User, int(payload["sub"]))
     return {
-        "authenticated": payload is not None,
-        "username": payload.get("sub") if payload else None,
-        "role": payload.get("role") if payload else None,
+        "authenticated": user is not None and not user.is_disabled,
+        "user_id": user.id if user and not user.is_disabled else None,
+        "username": user.email if user and not user.is_disabled else None,
+        "role": user.role if user and not user.is_disabled else None,
     }
 
 
@@ -330,6 +368,7 @@ async def list_users_endpoint(request: Request):
                 "id": u.id,
                 "email": u.email,
                 "role": u.role,
+                "is_disabled": u.is_disabled,
                 "created_at": u.created_at.isoformat(),
             }
             for u in users
@@ -345,11 +384,7 @@ async def create_user_endpoint(body: CreateUserRequest, request: Request):
     email = body.email.strip().lower()
     if not EMAIL_RE.fullmatch(email):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Enter a valid email address.")
-    if len(body.password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 8 characters.",
-        )
+    validate_password_length(body.password, min_length=8)
 
     session_maker = request.app.state.session_maker
     async with session_maker() as db:
@@ -363,6 +398,30 @@ async def create_user_endpoint(body: CreateUserRequest, request: Request):
             "id": user.id,
             "email": user.email,
             "role": user.role,
+            "is_disabled": user.is_disabled,
+            "created_at": user.created_at.isoformat(),
+        }
+
+
+@router.patch("/users/{user_id}")
+async def update_user_endpoint(user_id: int, body: UpdateUserRequest, request: Request):
+    current_user_id, role = get_current_user(request)
+    if role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+    if user_id == current_user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot disable your own account.")
+
+    session_maker = request.app.state.session_maker
+    async with session_maker() as db:
+        user = await user_service.set_user_disabled(db, user_id, body.is_disabled)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found or cannot be updated.")
+        await db.commit()
+        return {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "is_disabled": user.is_disabled,
             "created_at": user.created_at.isoformat(),
         }
 

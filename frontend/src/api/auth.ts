@@ -1,6 +1,7 @@
 import api from './client';
 
 export interface LoginResponse {
+  user_id: number;
   token: string;
   username: string;
   role: string;
@@ -18,6 +19,7 @@ export interface RegisterResponse {
 }
 
 export interface AuthStatusResponse {
+  user_id: number | null;
   authenticated: boolean;
   username: string | null;
   role: string | null;
@@ -102,6 +104,7 @@ export interface UserItem {
   id: number;
   email: string;
   role: string;
+  is_disabled: boolean;
   created_at: string;
 }
 
@@ -117,6 +120,11 @@ export async function createUser(email: string, password: string): Promise<UserI
 
 export async function deleteUser(userId: number): Promise<void> {
   await api.delete(`/auth/users/${userId}`);
+}
+
+export async function updateUser(userId: number, data: { is_disabled: boolean }): Promise<UserItem> {
+  const res = await api.patch<UserItem>(`/auth/users/${userId}`, data);
+  return res.data;
 }
 
 export function isAuthApiError(error: unknown): error is { response?: { data?: { detail?: string; message?: string } } } {

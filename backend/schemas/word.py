@@ -2,9 +2,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+WORD_TEXT_PATTERN = r"^[A-Za-z][A-Za-z'\- ]{0,127}$"
+
 
 class WordCreate(BaseModel):
-    text: str = Field(..., min_length=1, max_length=128)
+    text: str = Field(..., pattern=WORD_TEXT_PATTERN)
 
 
 class WordResponse(BaseModel):
@@ -35,6 +37,7 @@ class DefinitionBrief(BaseModel):
     canvas_image: str | None = None
     ink_data: str | None = None
     order: int = 0
+    is_primary: bool = False
     examples: list["ExampleBrief"] = []
 
     model_config = {"from_attributes": True}
@@ -69,6 +72,7 @@ class DefinitionUpdate(BaseModel):
     meaning_zh: str | None = Field(default=None, min_length=1)
     canvas_image: str | None = None
     ink_data: str | None = None
+    is_primary: bool | None = None
 
 
 class ExampleCreate(BaseModel):

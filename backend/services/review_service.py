@@ -308,8 +308,25 @@ async def get_review_stats(
     reviewed_result = await session.execute(reviewed_query)
     reviewed_today = reviewed_result.scalar() or 0
 
+    tomorrow_cutoff = review_day_cutoff(now + timedelta(days=1), config)
+    tomorrow_query = (
+        select(func.count())
+        .select_from(Word)
+        .join(ReviewRecord, Word.id == ReviewRecord.word_id)
+        .where(
+            has_defs,
+            ~ReviewRecord.phase.in_(("learning", "relearning")),
+            ReviewRecord.next_review > due_cutoff,
+            ReviewRecord.next_review <= tomorrow_cutoff,
+        )
+    )
+    tomorrow_query = _scope(tomorrow_query, user_id, role)
+    tomorrow_result = await session.execute(tomorrow_query)
+    estimated_due_tomorrow = tomorrow_result.scalar() or 0
+
     return {
         "due_count": due_count,
         "reviewed_today": reviewed_today,
         "total_words": total_words,
+        "estimated_due_tomorrow": estimated_due_tomorrow,
     }

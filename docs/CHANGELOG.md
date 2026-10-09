@@ -4,6 +4,97 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [2026-10-09] 设计系统重建 — 以获奖级品质重做全部界面
+
+**Status**: uncommitted working tree
+
+界面从「Tailwind 默认色 + 每页各自发挥」重建为一套有主张、可验证的设计系统。
+方向是 **ink on warm paper（暖纸上的墨）**：纸色地面、暖近黑正文，只有两个色相
+承担含义 —— indigo ink（交互）与 terracotta（强调）。
+
+详见 [`docs/design-system.md`](design-system.md)。
+
+### 设计系统（新增）
+- `src/styles/fonts.css` — 自托管三款可变字体（Inter / Fraunces / JetBrains Mono），
+  仅打包 Latin 子集，CJK 交给系统字体。不依赖 Google Fonts CDN（中国大陆不可达）。
+  来源与 OFL 授权见 `src/assets/fonts/README.txt`。
+- `src/styles/theme.css` — 全部令牌：字阶、色板、圆角、阴影、动效、布局预算。
+  `--text-*: initial` 删除 Tailwind 默认字阶，只留 13 级；漂移无处进入。
+- `src/styles/base.css` — 元素默认值、统一 focus ring、选区、纸纹、reduced-motion。
+- `src/styles/shell.css` — 应用外壳、视口预算、底部标签栏。
+- `src/styles/components.css` — 组件词汇：`.btn*` `.field*` `.card*` `.pill*`
+  `.word` `.ipa` `.num` `.eyebrow` `.kbd` `.empty` `.skeleton` `.track` 等。
+- 色板按对比度反推而非凭感觉：正文 16.2:1、次级 8.5:1、三级 5.2:1，
+  语义色及其 wash 配对全部实测 ≥4.5:1。`ink-faint` 仅用于装饰。
+
+### 界面
+- 登录页重做：暖纸双栏排版、Fraunces 主张标题、分段控件、真实密码可见性切换、
+  移动端品牌头；保留并重新配色了原有的角色插画（跟随光标）。
+- 应用外壳：`@headlessui` 账号菜单（键盘可达）、跳转到内容、滚动复位、
+  路由过渡、复习到期数角标、定制 Toast。
+- Capture：标题式 hero 输入改为「纸上的横线」而非方框。
+- Review：卡面用 Fraunces 排词、进度用 `.track`、评分按钮带色点与快捷键。
+- Words / WordDetail / Kaoyan / Settings：统一信息层级、空状态、骨架屏与分页。
+- CanvasPad 工具条、全屏书写面板、反馈/未保存/更新提示、诊断面板全部并入令牌体系。
+
+### 修复
+- **捕获已存在的单词会静默失败**：恢复路径请求 `page_size=200`，而接口上限为 100，
+  返回 422 导致既不跳转也无有效提示。现在 `api/words.ts` 统一钳制并导出
+  `MAX_PAGE_SIZE`，命中重复时直接打开已有卡片；新增 `src/api/words.test.ts` 回归测试。
+- 登录页 `useMemo` 位于提前 return 之后，破坏 Hook 顺序并触发 React 错误边界。
+- `AuthGate` 标题层级为 h2→h1；改为 DOM 顺序 h1 在前，视觉位置由 CSS `order` 决定。
+- 复习会话缺少 `h1`；Settings 标签页补全 `aria-controls` / `role="tabpanel"`。
+- `IcpRecordLink` / manifest / favicon / `theme-color` 仍是旧品牌色 `#4f46e5`，
+  已统一到 `--color-brand #4b44d6` 与 `--color-paper`；PWA 图标重新生成。
+- 删除死代码 `components/ReviewProgress.tsx`。
+
+### 视觉复核（第二轮）
+量测通过后做了真实的视觉逐页复核（逐张看渲染结果），修掉一批**只有眼睛能发现**的问题：
+- 禁用态主按钮在 42% 不透明度下变成一块死灰色板 —— 是全屏最重的元素却完全失效。
+  改为安静的描边态，焦点回到输入行。
+- 复习流程三处宽度不一致（表头 448px vs 卡片/按钮 320px），统一到同一栏宽。
+- 单词列表每行中间约 700px 死区；改为「左标签 / 右元数据」双边结构。
+- 设置页热力图右侧约 800px 空白；改为热力图与统计并排一行。
+- 话题分栏控件横跨整页却只占左侧 1/3；改为宽度自适应内容。
+- 词详情卡片把词性显示了两遍（方块 + 药丸）；方块改为表示「录入方式」。
+- 登录页大标题在 556px 栏内把 "good." 挤成第三行；降一档字号换回两行。
+- 登录页空密码框显示 10 个圆点，看起来像已填过；改为文字占位。
+- 触屏上出现「Enter to capture」「press 1–4」；按指针类型区分文案。
+- 移动端首屏因为外壳与整屏路由**重复预留**底部导航高度，多出 93px 滚动。
+- 装饰性光斑在标题后像一块污渍；降低不透明度并移出。
+- 进度条轨道在纸色上对比度仅 ~1.06:1，几乎看不见。
+- 截图工具本身有 viewport 传参 bug：`width/height` 传在顶层被忽略，
+  导致**移动端截图实际是 1280×720 桌面渲染**，移动端从未被真正看过。
+
+### 第三轮：配色切换 + 布局回归修复
+- **新增主题系统**：`Violet`（极简白紫，**默认**）与 `Paper`（暖纸墨色）。
+  所有颜色令牌经 `@theme inline` 映射到 `--t-*`，一个 `data-theme` 属性即可整体换肤；
+  阴影同样按主题切换。`index.html` 内联脚本在首帧前应用，避免闪色。
+  入口：顶栏半圆按钮 + 账号菜单；localStorage 持久化；`theme-color` 同步。
+  两套色板均按对比度实测（白紫：正文 16.8:1 / 次级 8.2:1 / 三级 5.0:1）。
+- **修复全屏路由的布局回归**（此前把 `calc()` 高度改成 flex 导致）：
+  - 复习卡片塌成 0px —— 卡片内部有 4 层 `h-full`，百分比在
+    「高度为 auto 的 flex item」上无法解析。恢复确定高度并把 footer 纳入预算。
+  - 全屏路由作为 flex item 时 `margin-inline: auto` 会触发 shrink-to-fit，
+    整列缩到 243px；补 `width: 100%`。
+  - 顶栏 1px 下边框未计入预算 → 首屏恒有 1px 滚动 → sticky 顶栏裁掉首行。
+  - 卡片背后两张装饰性「下一张」预览用 `aspect-[3/4]` 定位，矮窗口下溢出撑高文档。
+- **修复按钮居中**：`.btn` 是 `inline-flex`，行内级盒子的 `margin: auto` 被忽略，
+  导致「Show answer」比卡片偏左约 190px；`.btn-block` 改为 `display: flex`。
+- 手写画布保留自身纸质调色（导出图必须与手写所见一致），仅其元素底色跟随主题。
+
+### 验证
+- 新增可复现的量测工具 `frontend/scripts/design/`（DOM/对比度/目标尺寸/溢出/
+  字阶/色板/层级/motion + 截图像素分析）。
+- 全路由 × 桌面 1440 / 移动 390（触控模拟）× 关键交互态，
+  **两套主题各 22 项**：对比度失败 0、过小点击目标 0、横向溢出 0、每页恰好一个 h1。
+- 整屏路由在 390/641/768/900/1024/1280/1440 七种视口下**精确等于视口高度**
+  （零滚动、零裁切），卡片比例 0.73（≈3:4）。
+- `tsc -b --noEmit`、`eslint .`、`vitest run`（27 项）全绿；交互冒烟（翻卡→评分→
+  换卡、搜索、行菜单、账号菜单、`/` 快捷键）全部通过，无页面报错。
+
+---
+
 ## [2026-05-22] 邮箱验证码注册 + 用户配额控制
 
 **Commit**: `8fc2f6a`

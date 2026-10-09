@@ -1,6 +1,6 @@
 # 一触项目进展管理
 
-更新时间：2026-05-22
+更新时间：2026-06-03
 
 ## 当前定位
 
@@ -53,7 +53,7 @@
 
 - 测试与验证
 - 后端核心测试已覆盖收词、复习、同步边界、AI enrich 限额、Doubao provider、手写释义共存、邮箱注册、密码重置数据保留。
-  - 当前核心测试数量：16 条。
+  - 当前核心测试数量：24 条。
   - 常规验证命令：
     - `uv run python -m pytest backend/tests/test_core_flows.py`
     - `npm run build`
@@ -64,11 +64,15 @@
 - 已补方向
   - AI enrich 可观测性：已增加日志字段、耗时记录和 JSONL 汇总。
   - Admin 运行状态卡：已增加后端状态接口和前端 Runtime / AI enrich health 卡片。
+  - Admin 轻运营：已补用户数、禁用用户数、注册容量、近 7 日活跃和复习量、最近反馈和前端错误。
   - 安全收口：继续收紧公开配置暴露面。
   - 部署前安全 checklist：已新增 `docs/beta-deployment-checklist.md`。
+  - 复习体验：Review 完成页已显示今日已复习、今日剩余和明日预计。
+  - 主释义机制：定义已支持 `is_primary`，AI enrich 不抢占已有主释义。
+  - 数据可靠性：导出 JSON 已增加版本、导出时间、应用版本、复习算法和手写字段；导入支持 dry-run 预检查。
 
 - 仍待推进
-  - 继续补齐 auth / enrich / sync 的接口级测试。
+  - 继续观察内测反馈，把反馈和错误记录转成具体修复任务。
   - 部署前轮换 Ark Key，并确认 HTTPS 与反代配置。
 
 ## 当前风险

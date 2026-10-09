@@ -13,6 +13,7 @@ class ReviewStatsResponse(BaseModel):
     due_count: int
     reviewed_today: int
     total_words: int
+    estimated_due_tomorrow: int = 0
 
 
 class ReviewCardResponse(BaseModel):

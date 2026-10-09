@@ -73,6 +73,10 @@ async def enrich_word(
         select(func.count()).select_from(Definition).where(Definition.word_id == word.id)
     )
     order_offset = existing_count.scalar() or 0
+    existing_primary_count = await session.execute(
+        select(func.count()).select_from(Definition).where(Definition.word_id == word.id, Definition.is_primary.is_(True))
+    )
+    has_primary = (existing_primary_count.scalar() or 0) > 0
 
     for i, def_data in enumerate(enrich_result.definitions):
         definition = Definition(
@@ -81,6 +85,7 @@ async def enrich_word(
             meaning_en=def_data.get("meaning_en", ""),
             meaning_zh=def_data.get("meaning_zh", ""),
             order=order_offset + i,
+            is_primary=(i == 0 and not has_primary),
         )
         session.add(definition)
         await session.flush()

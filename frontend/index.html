@@ -2,14 +2,46 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/pwa-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#4f46e5" />
+    <!-- Matches --t-paper for the default theme; the store rewrites it on switch. -->
+    <meta name="theme-color" content="#f7f7fa" />
+    <!-- Apply the stored appearance before first paint, so a Paper user never sees
+         a flash of the default Violet shell. Mirrors applyTheme() in themeStore. -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('glm-words-theme');
+          var theme = raw ? (JSON.parse(raw).state || {}).theme : null;
+          if (theme === 'paper') {
+            document.documentElement.setAttribute('data-theme', 'paper');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#f4f1ea');
+          }
+        } catch (error) {
+          /* private mode or corrupt value: fall through to the default theme */
+        }
+      })();
+    </script>
+    <meta
+      name="description"
+      content="一触 — capture a word, write its definition by hand, and let spaced repetition bring it back at the moment you would forget."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="一触 — write it once, remember it for good" />
+    <meta
+      property="og:description"
+      content="A handwriting-first vocabulary app: capture a word, write its meaning on a full canvas, and review your own ink with SM-2 or FSRS."
+    />
+    <meta name="twitter:card" content="summary" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="一触" />
-    <title>一触</title>
+    <title>一触 — write it once, remember it for good</title>
   </head>
   <body>
     <div id="root"></div>

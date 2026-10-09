@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Request
+from sqlalchemy.exc import IntegrityError
 
 from backend.auth import get_current_user
 from backend.schemas.word import (
@@ -28,10 +29,16 @@ async def create_word(body: WordCreate, request: Request):
             word = await word_service.create_word(db, body.text, user_id=user_id)
             await db.commit()
             return word
-        except Exception as e:
+        except word_service.WordAlreadyExistsError:
+            await db.rollback()
+            raise HTTPException(status_code=409, detail=f"Word '{body.text}' already exists")
+        except IntegrityError as e:
             await db.rollback()
             if "UNIQUE constraint" in str(e):
                 raise HTTPException(status_code=409, detail=f"Word '{body.text}' already exists")
+            raise
+        except Exception:
+            await db.rollback()
             raise
 
 
@@ -81,10 +88,11 @@ async def get_word(word_id: int, request: Request):
 
 @router.patch("/{word_id}", response_model=WordResponse)
 async def update_word(word_id: int, body: WordUpdate, request: Request):
+    user_id, role = get_current_user(request)
     session_maker = _get_session(request)
     async with session_maker() as db:
         try:
-            word = await word_service.update_word(db, word_id, body.phonetic)
+            word = await word_service.update_word(db, word_id, body.phonetic, user_id=user_id, role=role)
             await db.commit()
             return word
         except ValueError:
@@ -114,6 +122,8 @@ async def add_definition(word_id: int, body: DefinitionCreate, request: Request)
             "meaning_zh": defn.meaning_zh,
             "canvas_image": defn.canvas_image,
             "ink_data": defn.ink_data,
+            "order": defn.order,
+            "is_primary": defn.is_primary,
         }
 
 
@@ -141,14 +151,17 @@ async def update_definition(word_id: int, def_id: int, body: DefinitionUpdate, r
             "meaning_zh": defn.meaning_zh,
             "canvas_image": defn.canvas_image,
             "ink_data": defn.ink_data,
+            "order": defn.order,
+            "is_primary": defn.is_primary,
         }
 
 
 @router.delete("/{word_id}/definitions/{def_id}", status_code=204)
 async def delete_definition(word_id: int, def_id: int, request: Request):
+    user_id, role = get_current_user(request)
     session_maker = _get_session(request)
     async with session_maker() as db:
-        deleted = await word_service.delete_definition(db, def_id)
+        deleted = await word_service.delete_definition(db, word_id, def_id, user_id=user_id, role=role)
         if not deleted:
             raise HTTPException(status_code=404, detail="Definition not found")
         await db.commit()
@@ -156,9 +169,10 @@ async def delete_definition(word_id: int, def_id: int, request: Request):
 
 @router.delete("/{word_id}", status_code=204)
 async def delete_word(word_id: int, request: Request):
+    user_id, role = get_current_user(request)
     session_maker = _get_session(request)
     async with session_maker() as db:
-        deleted = await word_service.delete_word(db, word_id)
+        deleted = await word_service.delete_word(db, word_id, user_id=user_id, role=role)
         if not deleted:
             raise HTTPException(status_code=404, detail="Word not found")
         await db.commit()

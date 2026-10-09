@@ -1,7 +1,15 @@
+import { getStroke } from 'perfect-freehand';
+
 import {
   BACKGROUND,
   GRID_SPACING,
   LINE_SPACING,
+  OUTLINE_END_TAPER,
+  OUTLINE_SIZE_GAIN,
+  OUTLINE_SMOOTHING,
+  OUTLINE_START_TAPER,
+  OUTLINE_STREAMLINE,
+  OUTLINE_THINNING,
   PAPER_HEIGHT,
   PREVIEW_MIME,
   PREVIEW_QUALITY,
@@ -21,6 +29,8 @@ import {
 } from './constants';
 import type { DocSize, InkStroke, PaperGuide, Point } from './types';
 
+export type StrokeRendererKind = 'outline' | 'legacy';
+
 function midpoint(a: Point, b: Point) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
@@ -37,10 +47,9 @@ function smoothedPressureAt(points: Point[], idx: number, window: number = PRESS
   return count > 0 ? sum / count : 0;
 }
 
-function computePenWidthTargetAt(stroke: InkStroke, idx: number) {
-  if (stroke.tool === 'eraser') return stroke.width;
+function strokeIntensityAt(stroke: InkStroke, idx: number) {
   const points = stroke.points;
-  if (idx < 1 || idx >= points.length) return stroke.width;
+  if (idx < 1 || idx >= points.length) return 0.5;
   const prev = points[idx - 1];
   const curr = points[idx];
 
@@ -73,9 +82,14 @@ function computePenWidthTargetAt(stroke: InkStroke, idx: number) {
     const slowness = 1 - decay;
     intensity = NO_PRESSURE_BASE + slowness * NO_PRESSURE_SLOW_GAIN + tiltNorm * NO_PRESSURE_TILT_GAIN;
   }
+  return intensity * velocityFactor;
+}
 
+function computePenWidthTargetAt(stroke: InkStroke, idx: number) {
+  if (stroke.tool === 'eraser') return stroke.width;
+  const intensity = strokeIntensityAt(stroke, idx);
   const weight = stroke.weight ?? 1;
-  return (stroke.width + intensity * PRESSURE_GAIN * velocityFactor) * weight;
+  return (stroke.width + intensity * PRESSURE_GAIN) * weight;
 }
 
 function computePenWidthAt(stroke: InkStroke, idx: number) {
@@ -127,7 +141,87 @@ export function paintStrokeTail(ctx: CanvasRenderingContext2D, stroke: InkStroke
   ctx.stroke();
 }
 
-export function paintFullStroke(ctx: CanvasRenderingContext2D, stroke: InkStroke) {
+function outlineInput(stroke: InkStroke): number[][] {
+  const n = stroke.points.length;
+  const pts: number[][] = [];
+  for (let i = 0; i < n; i += 1) {
+    const p = stroke.points[i];
+    const idx = i === 0 && n > 1 ? 1 : i;
+    const intensity = idx >= 1 ? strokeIntensityAt(stroke, idx) : 0.5;
+    const pressure = Math.max(0, Math.min(1, 0.3 + intensity * 0.7));
+    pts.push([p.x, p.y, pressure]);
+  }
+  return pts;
+}
+
+function paintOutlineStroke(ctx: CanvasRenderingContext2D, stroke: InkStroke, isPartial: boolean) {
+  const weight = stroke.weight ?? 1;
+  const size = (stroke.width + OUTLINE_SIZE_GAIN * PRESSURE_GAIN) * weight;
+
+  // A tap produces 1-3 nearly-coincident points; its path length sits below
+  // the taper scale, so outline generation degenerates to near-zero radius.
+  // Render any stroke that short as a visible round dab (the dot over "i").
+  let pathLen = 0;
+  let cxSum = 0;
+  let cySum = 0;
+  for (let i = 0; i < stroke.points.length; i += 1) {
+    const p = stroke.points[i];
+    cxSum += p.x;
+    cySum += p.y;
+    if (i > 0) {
+      const prev = stroke.points[i - 1];
+      pathLen += Math.hypot(p.x - prev.x, p.y - prev.y);
+    }
+  }
+  if (pathLen < 3) {
+    const count = stroke.points.length || 1;
+    ctx.fillStyle = stroke.color;
+    ctx.beginPath();
+    ctx.arc(cxSum / count, cySum / count, Math.max(1.6, size * 0.8), 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+
+  const outline = getStroke(outlineInput(stroke), {
+    size,
+    thinning: OUTLINE_THINNING,
+    smoothing: OUTLINE_SMOOTHING,
+    streamline: OUTLINE_STREAMLINE,
+    simulatePressure: false,
+    last: isPartial,
+    start: { taper: OUTLINE_START_TAPER, easing: (t: number) => t * t, cap: true },
+    end: { taper: OUTLINE_END_TAPER, easing: (t: number) => t * (2 - t), cap: true },
+  });
+  if (outline.length === 0) return;
+  const path = new Path2D();
+  path.moveTo(outline[0][0], outline[0][1]);
+  for (let i = 1; i < outline.length; i += 1) {
+    path.lineTo(outline[i][0], outline[i][1]);
+  }
+  path.closePath();
+  ctx.fillStyle = stroke.color;
+  ctx.fill(path);
+}
+
+export function paintActiveStroke(
+  ctx: CanvasRenderingContext2D,
+  stroke: InkStroke,
+  renderer: StrokeRendererKind = 'outline',
+) {
+  if (renderer === 'outline' && stroke.tool !== 'eraser') {
+    paintOutlineStroke(ctx, stroke, true);
+    return;
+  }
+  for (let i = 1; i < stroke.points.length; i += 1) {
+    paintSegmentAt(ctx, stroke, i);
+  }
+}
+
+export function paintFullStroke(ctx: CanvasRenderingContext2D, stroke: InkStroke, renderer: StrokeRendererKind = 'outline') {
+  if (renderer === 'outline' && stroke.tool !== 'eraser') {
+    paintOutlineStroke(ctx, stroke, false);
+    return;
+  }
   const points = stroke.points;
   if (points.length === 0) return;
   if (points.length === 1) {

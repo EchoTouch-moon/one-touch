@@ -1,6 +1,14 @@
 import api from './client';
 import type { Word, WordDetail, WordListResponse, WordCreate } from '../types/word';
 
+/**
+ * The server rejects `page_size > 100` with a 422. Callers that want "all of
+ * them" (looking up whether a word already exists) used to ask for 200 and get
+ * a validation error back, which broke the duplicate-capture recovery path.
+ * Clamping here means no caller can send an out-of-range value again.
+ */
+export const MAX_PAGE_SIZE = 100;
+
 export async function createWord(data: WordCreate): Promise<Word> {
   const res = await api.post<Word>('/words', data);
   return res.data;
@@ -12,7 +20,10 @@ export async function listWords(params?: {
   status?: string;
   q?: string;
 }): Promise<WordListResponse> {
-  const res = await api.get<WordListResponse>('/words', { params });
+  const query = params && params.page_size !== undefined
+    ? { ...params, page_size: Math.min(Math.max(1, params.page_size), MAX_PAGE_SIZE) }
+    : params;
+  const res = await api.get<WordListResponse>('/words', { params: query });
   return res.data;
 }
 
@@ -55,6 +66,7 @@ export async function updateDefinition(
     meaning_zh?: string;
     canvas_image?: string | null;
     ink_data?: string | null;
+    is_primary?: boolean;
   },
 ): Promise<{ id: number }> {
   const res = await api.patch<{ id: number }>(`/words/${wordId}/definitions/${defId}`, data);

@@ -1,0 +1,230 @@
+/* ── Design tokens ───────────────────────────────────────────────────────────
+   One place that decides type, colour, depth, radius and motion.
+
+   Theming: everything colour-shaped resolves through a plain custom property
+   (`--t-*`), and `@theme inline` makes the utilities emit those properties
+   directly. So a single `data-theme` attribute on <html> reskins the whole app
+   with no duplicate utility classes and no per-component branching.
+
+     :root                  → "Violet": minimal white + violet (the default)
+     [data-theme='paper']   → "Paper": warm ink on off-white stock
+
+   Every text tone in both sets was measured against its own ground: the
+   accessible pairing is the default one, not a later correction.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* ── typefaces ── */
+  --font-sans: "Inter Variable", ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Fraunces Variable", "Iowan Old Style", "Palatino Linotype",
+    Georgia, "Songti SC", "Noto Serif SC", serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo,
+    "Cascadia Mono", monospace;
+
+  /* ── type scale ──
+     `--text-*: initial` drops Tailwind's default ladder, so every size in the
+     product is one of these thirteen. That is the whole point: if a size is not
+     here, it does not exist, and drift cannot creep in. */
+  --text-*: initial;
+
+  --text-2xs: 0.625rem;          /* 10 — chips, hotkeys */
+  --text-2xs--line-height: 1.4;
+  --text-xs: 0.6875rem;          /* 11 — tabular micro labels */
+  --text-xs--line-height: 1.45;
+  --text-micro: 0.75rem;         /* 12 */
+  --text-micro--line-height: 1.45;
+  --text-meta: 0.8125rem;        /* 13 — the workhorse */
+  --text-meta--line-height: 1.5;
+  --text-body: 0.9375rem;        /* 15 */
+  --text-body--line-height: 1.65;
+  --text-lead: 1.0625rem;        /* 17 — reading text */
+  --text-lead--line-height: 1.6;
+  --text-lg: 1.25rem;            /* 20 */
+  --text-lg--line-height: 1.4;
+  --text-title: 1.375rem;        /* 22 */
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.015em;
+  --text-xl: 1.5rem;             /* 24 — the definition you read on a card */
+  --text-xl--line-height: 1.35;
+  --text-xl--letter-spacing: -0.018em;
+  --text-display-sm: 1.75rem;    /* 28 — page titles */
+  --text-display-sm--line-height: 1.15;
+  --text-display-sm--letter-spacing: -0.02em;
+  --text-display: 2.5rem;        /* 40 */
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.028em;
+  --text-word: 3rem;             /* 48 — the flashcard word */
+  --text-word--line-height: 1;
+  --text-word--letter-spacing: -0.03em;
+  --text-display-lg: 3.5rem;     /* 56 */
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.034em;
+  --text-eyebrow: 0.6875rem;     /* 11 + tracking + caps */
+  --text-eyebrow--line-height: 1.1;
+  --text-eyebrow--letter-spacing: 0.15em;
+
+  /* ── radius ── */
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 26px;
+  --radius-3xl: 34px;
+
+  /* ── motion ── */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.5, 1);
+  --ease-in-out-soft: cubic-bezier(0.5, 0, 0.2, 1);
+
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── layout ── */
+  --spacing: 0.25rem;
+  --container-prose: 36rem;
+  --container-page: 68rem;
+  --container-review: 22rem;
+}
+
+/* Themeable tokens. `inline` makes `bg-paper` compile to `var(--t-paper)`, so
+   the value can change at runtime without regenerating any CSS. */
+@theme inline {
+  --color-paper: var(--t-paper);
+  --color-paper-deep: var(--t-paper-deep);
+  --color-well: var(--t-well);
+  --color-surface: var(--t-surface);
+  --color-surface-2: var(--t-surface-2);
+  --color-line: var(--t-line);
+  --color-line-strong: var(--t-line-strong);
+
+  --color-ink: var(--t-ink);
+  --color-ink-soft: var(--t-ink-soft);
+  --color-ink-mute: var(--t-ink-mute);
+  --color-ink-faint: var(--t-ink-faint);
+
+  --color-brand: var(--t-brand);
+  --color-brand-deep: var(--t-brand-deep);
+  --color-brand-wash: var(--t-brand-wash);
+  --color-brand-line: var(--t-brand-line);
+  --color-accent: var(--t-accent);
+  --color-accent-wash: var(--t-accent-wash);
+
+  --color-good: var(--t-good);
+  --color-good-wash: var(--t-good-wash);
+  --color-warn: var(--t-warn);
+  --color-warn-wash: var(--t-warn-wash);
+  --color-bad: var(--t-bad);
+  --color-bad-wash: var(--t-bad-wash);
+
+  /* Depth is warm under Paper and cool under Violet, so the tint is themed too. */
+  --shadow-hair: 0 1px 2px var(--t-shadow-1);
+  --shadow-card: 0 1px 2px var(--t-shadow-1), 0 10px 24px -14px var(--t-shadow-2);
+  --shadow-lift: 0 2px 4px var(--t-shadow-1), 0 20px 44px -20px var(--t-shadow-2);
+  --shadow-float: 0 1px 2px var(--t-shadow-1), 0 18px 40px -18px var(--t-shadow-2),
+    0 48px 96px -48px var(--t-shadow-3);
+  --shadow-pop: 0 6px 16px -6px var(--t-shadow-2), 0 28px 60px -24px var(--t-shadow-3);
+}
+
+/* ── Violet — minimal white + violet (default) ─────────────────────────────
+   The product's original palette, rebuilt on the same token names. */
+:root {
+  --t-paper: #f7f7fa;
+  --t-paper-deep: #eeeef4;
+  --t-well: #f2f2f7;
+  --t-surface: #ffffff;
+  --t-surface-2: #fbfbfe;
+  --t-line: #e9e9f0;
+  --t-line-strong: #d8d8e4;
+
+  --t-ink: #16161f;        /* 16.8:1 on paper */
+  --t-ink-soft: #4a4a57;   /* 8.2:1 */
+  --t-ink-mute: #6a6a7a;   /* 5.0:1 */
+  --t-ink-faint: #a3a3b2;  /* 2.3:1 — decorative only */
+
+  --t-brand: #4f46e5;
+  --t-brand-deep: #4338ca;
+  --t-brand-wash: #eef2ff;
+  --t-brand-line: #c7d2fe;
+  --t-accent: #7c3aed;
+  --t-accent-wash: #f5f3ff;
+
+  --t-good: #047857;
+  --t-good-wash: #ecfdf5;
+  --t-warn: #b45309;
+  --t-warn-wash: #fffbeb;
+  --t-bad: #be123c;
+  --t-bad-wash: #fff1f2;
+
+  --t-shadow-1: rgba(15, 23, 42, 0.06);
+  --t-shadow-2: rgba(15, 23, 42, 0.16);
+  --t-shadow-3: rgba(15, 23, 42, 0.22);
+
+  --t-grain: 0;
+  --t-canvas-brand: 7%;
+  --t-canvas-accent: 5%;
+}
+
+/* ── Paper — warm ink on off-white stock ──────────────────────────────────── */
+[data-theme='paper'] {
+  --t-paper: #f4f1ea;
+  --t-paper-deep: #ece7dc;
+  --t-well: #f2eee6;
+  --t-surface: #fffdf9;
+  --t-surface-2: #faf7f1;
+  --t-line: #e6e0d5;
+  --t-line-strong: #d5cdbe;
+
+  --t-ink: #17150f;        /* 16.2:1 on paper */
+  --t-ink-soft: #4a443c;   /* 8.5:1 */
+  --t-ink-mute: #6b6459;   /* 5.2:1 */
+  --t-ink-faint: #a9a196;  /* decorative only */
+
+  --t-brand: #4b44d6;
+  --t-brand-deep: #3a33b8;
+  --t-brand-wash: #eceafb;
+  --t-brand-line: #d2cef6;
+  --t-accent: #a8462c;
+  --t-accent-wash: #f9ece5;
+
+  --t-good: #17694a;
+  --t-good-wash: #e6f2ec;
+  --t-warn: #86530f;
+  --t-warn-wash: #f8efe0;
+  --t-bad: #a52f1c;
+  --t-bad-wash: #fbeae6;
+
+  --t-shadow-1: rgba(46, 38, 24, 0.05);
+  --t-shadow-2: rgba(46, 38, 24, 0.22);
+  --t-shadow-3: rgba(46, 38, 24, 0.3);
+
+  --t-grain: 0.026;
+  --t-canvas-brand: 5%;
+  --t-canvas-accent: 5%;
+}
+
+/* Duration ladder, so timing is a decision and not an accident. */
+:root {
+  --dur-tap: 120ms;
+  --dur-quick: 180ms;
+  --dur-base: 260ms;
+  --dur-slow: 420ms;
+  --dur-page: 520ms;
+
+  /* One viewport budget shared by the shell, cards and editing surfaces.
+     `--footer-h` is a fixed height so the arithmetic below is exact; the footer
+     is clipped to it rather than allowed to change the budget. */
+  /* +1px: the header's own bottom hairline sits outside its content height. */
+  --shell-top: calc(3.25rem + 1px);
+  --shell-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  --footer-h: 2.25rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --shell-top: calc(3.75rem + 1px);
+    --shell-bottom: 0px;
+  }
+}

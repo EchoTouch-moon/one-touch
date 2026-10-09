@@ -28,3 +28,6 @@ dev = [
 dev = [
     "ruff>=0.15.12",
 ]
+
+[tool.setuptools.packages.find]
+include = ["backend*"]

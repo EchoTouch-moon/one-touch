@@ -63,7 +63,7 @@ POST /api/review/submit
 backend/services/review_service.py
 submit_review()
   ↓
-SM-2 计算下一次复习间隔
+SM-2 / FSRS 根据配置计算下一次复习间隔
   ↓
 更新 review_records
   ↓
@@ -237,7 +237,7 @@ else:
 
 ## 4. 这份代码里有哪些经典算法 / 设计模式
 
-### 4.1 SM-2 间隔重复算法
+### 4.1 SM-2 / FSRS 可配置间隔重复算法
 
 位置：[backend/srs/sm2.py](../backend/srs/sm2.py)
 
@@ -253,7 +253,7 @@ else:
 
 位置：[backend/srs/base.py](../backend/srs/base.py)、[backend/srs/sm2.py](../backend/srs/sm2.py)
 
-`BaseSRS` 定义接口，`SM2Algorithm` 负责具体实现。  
+`BaseSRS` 定义接口，`SM2Algorithm` 和 `FSRSAlgorithm` 负责具体实现，当前由 `GLM_WORDS_REVIEW_ALGORITHM` 选择。  
 以后如果想换别的复习算法，不需要改业务主流程，只换策略实现。
 
 ### 4.3 工厂模式
@@ -374,13 +374,13 @@ page -> store -> api -> ui component
 解决方案：
 
 - 使用 `review_records` 独立记录每个单词的复习状态
-- 使用 SM-2 算法计算 `ease_factor`、`interval_days`、`repetitions`、`next_review`
+- 使用 SM-2 / FSRS 算法计算 `ease_factor`、`interval_days`、`repetitions`、`next_review`，FSRS 额外维护 `difficulty`、`stability`、`retrievability`
 - 通过 `get_due_words()` 只拉取“有释义且到期”的单词
 - 前端按 5 张一组组织复习，降低用户认知负担
 
 含金量表述：
 
-> 项目实现了基于 SM-2 的间隔重复系统，将用户评分转化为可持久化的记忆状态，并通过 `next_review` 驱动复习队列生成，实现了从“静态词库”到“个性化复习系统”的升级。
+> 项目实现了可配置的间隔重复系统，将用户评分转化为可持久化的记忆状态，并通过 `next_review` 驱动复习队列生成，实现了从“静态词库”到“个性化复习系统”的升级。
 
 #### 难点二：弱网/离线复习的一致性处理
 

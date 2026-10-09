@@ -43,15 +43,37 @@ Thumbs.db
 # Claude / agent state
 .claude/
 
+# Agent working memory (contains private deployment details: server IP, SSH, DNS)
+.workbuddy/
+
 # Local scratch
 temp/
 tmp/
 
+# Generated personal documents (never committed, never published)
+output/
+
 # Personal docs (not project-related)
 AI开发.md
 简历.md
+一触项目_AI应用开发面试速答手册.pdf
 
 # Stylus diagnostic dumps (kept locally, never committed)
 stylus diagnostics.jpg
 stylus-diagnostics-*.json
 *diagnostics*.json
+
+# Kaoyan corpus sources: exam paper texts and ECDICT db stay local (copyright);
+# only generated kaoyan_words.json / exam_sentences.json are committed.
+data/kaoyan/exam_texts/
+temp/ecdict/
+temp/corpus/
+temp/*.zip
+
+# Exceptions: generated kaoyan lexicon data is committed (sources stay ignored).
+!data/
+data/*
+!data/kaoyan/
+data/kaoyan/*
+!data/kaoyan/kaoyan_words.json
+!data/kaoyan/exam_sentences.json

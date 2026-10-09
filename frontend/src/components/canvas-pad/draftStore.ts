@@ -34,7 +34,7 @@ export async function readDraftRecord(key: string): Promise<InkDraftRecord | nul
   });
 }
 
-export async function writeDraftRecord(record: InkDraftRecord): Promise<void> {
+async function writeRecord(record: InkDraftRecord): Promise<void> {
   if (!('indexedDB' in window)) return;
   const db = await openDraftDb();
   return new Promise((resolve, reject) => {
@@ -51,7 +51,7 @@ export async function writeDraftRecord(record: InkDraftRecord): Promise<void> {
   });
 }
 
-export async function deleteDraftRecord(key: string): Promise<void> {
+async function deleteRecord(key: string): Promise<void> {
   if (!('indexedDB' in window)) return;
   const db = await openDraftDb();
   return new Promise((resolve, reject) => {
@@ -67,3 +67,14 @@ export async function deleteDraftRecord(key: string): Promise<void> {
     };
   });
 }
+
+const writes = new Map<string, Promise<void>>();
+function serialize(key: string, work: () => Promise<void>) {
+  const next = (writes.get(key) ?? Promise.resolve()).catch(() => undefined).then(work);
+  writes.set(key, next);
+  void next.finally(() => { if (writes.get(key) === next) writes.delete(key); }).catch(() => undefined);
+  return next;
+}
+export function writeDraftRecord(record: InkDraftRecord) { return serialize(record.key, () => writeRecord(record)); }
+export function deleteDraftRecord(key: string) { return serialize(key, () => deleteRecord(key)); }
+export function flushDraftWrites() { return Promise.all([...writes.values()]); }

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
+from sqlalchemy import select
 
 from backend.auth import get_current_user
+from backend.models.kaoyan import KaoyanWord
 from backend.schemas.review import ReviewStatsResponse, ReviewSubmit
 from backend.services import review_service
 
@@ -11,10 +13,36 @@ def _get_session(request: Request):
     return request.app.state.session_maker
 
 
+async def _attach_kaoyan(db, state, items: list[dict]) -> list[dict]:
+    """Annotate review cards with lexicon translation and exam sentences."""
+    index = getattr(state, "kaoyan_index", None) or {}
+    texts = [item["text"] for item in items]
+    if not texts:
+        return items
+    rows = await db.execute(select(KaoyanWord).where(KaoyanWord.word.in_(texts)))
+    by_word = {kw.word: kw for kw in rows.scalars().all()}
+    for item in items:
+        kw = by_word.get(item["text"])
+        if kw is None:
+            continue
+        item["kaoyan"] = {
+            "translation": kw.translation,
+            "phonetic": kw.phonetic,
+            "sentences": index.get(item["text"], [])[:3],
+        }
+    return items
+
+
 def _serialize_word(w):
     rr = w.review_record
     defs = [
-        {"pos": d.pos, "meaning_zh": d.meaning_zh, "canvas_image": d.canvas_image, "ink_data": d.ink_data}
+        {
+            "pos": d.pos,
+            "meaning_zh": d.meaning_zh,
+            "canvas_image": d.canvas_image,
+            "ink_data": d.ink_data,
+            "is_primary": d.is_primary,
+        }
         for d in w.definitions
     ]
     return {
@@ -70,6 +98,7 @@ async def get_review_session(request: Request):
             config=request.app.state.config.review,
         )
         items = [_serialize_word(w) for w in words]
+        items = await _attach_kaoyan(db, request.app.state, items)
         return {"items": items, "total": len(items), "stats": stats}
 
 

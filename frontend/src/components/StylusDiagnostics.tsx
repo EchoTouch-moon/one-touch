@@ -86,9 +86,9 @@ function formatNumber(value: number, digits = 3) {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-50 px-3 py-1.5 text-sm last:border-0">
-      <span className="text-xs uppercase tracking-wide text-gray-400">{label}</span>
-      <span className="font-mono text-gray-800">{value}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2 text-meta last:border-0">
+      <span className="eyebrow">{label}</span>
+      <span className="num text-ink">{value}</span>
     </div>
   );
 }
@@ -203,9 +203,9 @@ export default function StylusDiagnostics() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <p className="mb-3 text-xs uppercase tracking-wide text-gray-400">Browser capabilities</p>
-        <div className="grid gap-2 text-sm sm:grid-cols-2">
+      <div className="card p-4">
+        <p className="mb-3 eyebrow">Browser capabilities</p>
+        <div className="grid gap-2 text-meta sm:grid-cols-2">
           {[
             ['PointerEvent', capabilities.pointerEvent],
             ['pointerrawupdate', capabilities.rawUpdate],
@@ -214,46 +214,42 @@ export default function StylusDiagnostics() {
           ].map(([label, on]) => (
             <div
               key={label as string}
-              className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-1.5"
+              className="flex items-center justify-between rounded-sm bg-surface-2 px-3 py-1.5"
             >
-              <span className="text-gray-600">{label}</span>
-              <span className={`font-mono text-xs ${on ? 'text-emerald-600' : 'text-gray-400'}`}>
+              <span className="text-ink-soft">{label}</span>
+              <span className={`num text-micro ${on ? 'text-good' : 'text-ink-mute'}`}>
                 {on ? 'available' : 'not detected'}
               </span>
             </div>
           ))}
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-1.5">
-            <span className="text-gray-600">maxTouchPoints</span>
-            <span className="font-mono text-xs text-gray-700">{capabilities.maxTouchPoints}</span>
+          <div className="flex items-center justify-between rounded-sm bg-surface-2 px-3 py-1.5">
+            <span className="text-ink-soft">maxTouchPoints</span>
+            <span className="num text-micro text-ink-soft">{capabilities.maxTouchPoints}</span>
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-1.5">
-            <span className="text-gray-600">devicePixelRatio</span>
-            <span className="font-mono text-xs text-gray-700">
+          <div className="flex items-center justify-between rounded-sm bg-surface-2 px-3 py-1.5">
+            <span className="text-ink-soft">devicePixelRatio</span>
+            <span className="num text-micro text-ink-soft">
               {capabilities.devicePixelRatio.toFixed(2)}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="card p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-xs uppercase tracking-wide text-gray-400">Pointer pad</p>
+          <p className="eyebrow">Pointer pad</p>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleToggleRecord}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                recording
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`btn btn-sm ${recording ? 'btn-danger' : 'btn-secondary'}`}
             >
               {recording ? `Recording (${sampleCount})` : 'Record'}
             </button>
             <button
               type="button"
               onClick={handleClear}
-              className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-200"
+              className="btn btn-sm btn-ghost"
             >
               Clear
             </button>
@@ -261,7 +257,7 @@ export default function StylusDiagnostics() {
               type="button"
               onClick={handleExport}
               disabled={sampleCount === 0}
-              className="rounded-md bg-gray-900 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-gray-800 disabled:opacity-40"
+              className="btn btn-sm btn-primary"
             >
               Export JSON
             </button>
@@ -269,7 +265,7 @@ export default function StylusDiagnostics() {
               type="button"
               onClick={handleDownload}
               disabled={sampleCount === 0}
-              className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
+              className="btn btn-sm btn-secondary"
             >
               Download
             </button>
@@ -283,28 +279,28 @@ export default function StylusDiagnostics() {
           onPointerCancel={handlePointer}
           onPointerLeave={handlePointer}
           onContextMenu={(e) => e.preventDefault()}
-          className="relative h-44 w-full touch-none select-none rounded-lg border border-dashed border-gray-300 bg-gray-50"
+          className="relative h-44 w-full touch-none select-none rounded-md border border-dashed border-line-strong bg-surface-2"
         >
-          <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-gray-400">
+          <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-micro text-ink-mute">
             Tap or write here to read live pointer events
           </p>
           {latest && (
             <div
-              className="pointer-events-none absolute h-3 w-3 rounded-full border border-indigo-400 bg-indigo-100"
+              className="pointer-events-none absolute h-3 w-3 rounded-full border border-brand bg-brand-wash"
               style={{
                 transform: `translate(${latest.x - 6}px, ${latest.y - 6}px)`,
               }}
             />
           )}
         </div>
-        <p className="mt-2 text-[11px] text-gray-400">
-          Stylus barrel button typically maps to <code className="rounded bg-gray-100 px-1">buttons = 0b000010</code>.
-          Eraser tip on supported pens reports <code className="rounded bg-gray-100 px-1">buttons = 0b100000</code>.
+        <p className="mt-2 text-micro text-ink-mute">
+          Stylus barrel button typically maps to <code className="rounded-xs bg-well px-1">buttons = 0b000010</code>.
+          Eraser tip on supported pens reports <code className="rounded-xs bg-well px-1">buttons = 0b100000</code>.
         </p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white">
-        <p className="border-b border-gray-50 px-3 py-2 text-xs uppercase tracking-wide text-gray-400">
+      <div className="card">
+        <p className="border-b border-line px-3.5 py-2.5 eyebrow">
           Latest event
         </p>
         {latest ? (
@@ -322,27 +318,27 @@ export default function StylusDiagnostics() {
             <Row label="position" value={`${latest.x.toFixed(0)}, ${latest.y.toFixed(0)}`} />
           </div>
         ) : (
-          <p className="px-3 py-6 text-center text-sm text-gray-400">
+          <p className="px-3 py-6 text-center text-meta text-ink-mute">
             No pointer events yet.
           </p>
         )}
       </div>
 
       {exportText && (
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="card p-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Export</p>
+            <p className="eyebrow">Export</p>
             {clipboardNote && (
-              <span className="text-[11px] text-gray-500">{clipboardNote}</span>
+              <span className="text-micro text-ink-mute">{clipboardNote}</span>
             )}
           </div>
           <textarea
             readOnly
             value={exportText}
             onClick={handleSelectAll}
-            className="block h-40 w-full resize-y rounded-lg border border-gray-200 bg-gray-50 p-2 font-mono text-[11px] text-gray-700"
+            className="block h-40 w-full resize-y rounded-sm border border-line bg-surface-2 p-2 font-mono text-micro text-ink-soft"
           />
-          <p className="mt-2 text-[11px] text-gray-400">
+          <p className="mt-2 text-micro text-ink-mute">
             Tap the box to select everything, then long-press to copy. The Download button also writes a `.json` file.
           </p>
         </div>
