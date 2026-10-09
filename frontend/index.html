@@ -14,7 +14,9 @@
     <script>
       (function () {
         try {
-          var raw = localStorage.getItem('glm-words-theme');
+          // The storage key was renamed from 'glm-words-theme'; the legacy name
+          // is still read because this runs before main.tsx migrates the keys.
+          var raw = localStorage.getItem('onetouch-theme') || localStorage.getItem('glm-words-theme');
           var theme = raw ? (JSON.parse(raw).state || {}).theme : null;
           if (theme === 'paper') {
             document.documentElement.setAttribute('data-theme', 'paper');

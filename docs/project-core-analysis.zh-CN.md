@@ -253,7 +253,7 @@ else:
 
 位置：[backend/srs/base.py](../backend/srs/base.py)、[backend/srs/sm2.py](../backend/srs/sm2.py)
 
-`BaseSRS` 定义接口，`SM2Algorithm` 和 `FSRSAlgorithm` 负责具体实现，当前由 `GLM_WORDS_REVIEW_ALGORITHM` 选择。  
+`BaseSRS` 定义接口，`SM2Algorithm` 和 `FSRSAlgorithm` 负责具体实现，当前由 `ONETOUCH_REVIEW_ALGORITHM` 选择。  
 以后如果想换别的复习算法，不需要改业务主流程，只换策略实现。
 
 ### 4.3 工厂模式

@@ -16,7 +16,7 @@ export function replaceCurrentAuthToken(token: string | null, userId: number | n
 export function getCurrentAuthToken() { return currentToken; }
 export function bumpAuthSessionEpoch() {
   sessionEpoch += 1;
-  window.dispatchEvent(new Event('glm-words-session-changed'));
+  window.dispatchEvent(new Event('onetouch-session-changed'));
   return sessionEpoch;
 }
 export function getAuthSessionEpoch() { return sessionEpoch; }

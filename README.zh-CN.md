@@ -106,7 +106,7 @@ npm run dev                   # http://127.0.0.1:5173，/api 代理到 :8000
 ```
 
 首次启动会用 `.env` 里的管理员账号初始化数据库，并把 `data/kaoyan/` 里的考研语料导入。
-数据库默认位于 `~/.glm-words/words.db`，可用 `GLM_WORDS_DATABASE_URL` 改。
+数据库默认位于 `~/.one-touch/words.db`，可用 `ONETOUCH_DATABASE_URL` 改。
 
 > **关于考研语料。** `data/kaoyan/` 由 `scripts/kaoyan/` 在本地从真题和第三方词典生成，**不随源码
 > 分发**（这些输入本身不能再分发）。没有它应用照样启动，其他功能全部可用，只是考研词库为空。
@@ -116,25 +116,27 @@ npm run dev                   # http://127.0.0.1:5173，/api 代理到 :8000
 
 ### 环境变量
 
-全部通过环境变量配置，可从 `.env.example` 起步。
+全部通过环境变量配置，可从 `.env.example` 起步。变量统一使用 `ONETOUCH_` 前缀；此前的
+`GLM_WORDS_` 名称仍会作为兜底读取，已有部署无需改动即可继续运行，只会在日志里给出一条弃用
+提示——方便时改名即可。
 
 | 变量 | 默认值 | 作用 |
 | --- | --- | --- |
-| `GLM_WORDS_ADMIN_USERNAME` / `_PASSWORD` | `admin` / `change-me` | 初始化管理员 |
-| `GLM_WORDS_AUTH_SECRET` | `change-this-secret` | 令牌签名密钥（非调试需 ≥ 32 位） |
-| `GLM_WORDS_DATABASE_URL` | `~/.glm-words/words.db` | SQLite 位置 |
-| `GLM_WORDS_ALLOWED_ORIGINS` | `localhost:5173`、`127.0.0.1:5173` | CORS 白名单 |
-| `GLM_WORDS_REVIEW_ALGORITHM` | `sm2` | `sm2` 或 `fsrs` |
-| `GLM_WORDS_TARGET_RETRIEVABILITY` | `0.9` | FSRS 目标可提取度 |
-| `GLM_WORDS_REVIEW_TIMEZONE` / `_DAY_BOUNDARY_HOUR` | `Asia/Shanghai` / `4` | 「今天」从几点算起 |
-| `GLM_WORDS_ENRICH_DAILY_LIMIT` | `5` | 每用户每日 AI 增强次数 |
-| `GLM_WORDS_LLM_PROVIDER` | `ollama` | `openai` · `anthropic` · `doubao` · `ollama` |
-| `GLM_WORDS_LLM_MODEL`、`_BASE_URL`、`_API_KEY`、`_OPENAI_API_KEY`、`_ANTHROPIC_API_KEY`、`_DOUBAO_API_KEY` | — | 模型凭据，仅服务端 |
-| `GLM_WORDS_REGISTRATION_ENABLED` / `_MAX_USERS` | `false` / `30` | 邮箱验证码自助注册 |
-| `GLM_WORDS_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_TLS` | — | 验证码邮件（未配置时写到日志） |
-| `GLM_WORDS_BACKUP_ENABLED` / `_DIR` / `_RETENTION_DAYS` / `_INTERVAL_HOURS` | `true` / `~/.glm-words/backups` / `7` / `24` | SQLite 备份 |
-| `GLM_WORDS_LOG_DIR` | `~/.glm-words/logs` | `app.log` 与 `access.log` |
-| `GLM_WORDS_DEBUG` | `false` | 跳过生产密钥校验 |
+| `ONETOUCH_ADMIN_USERNAME` / `_PASSWORD` | `admin` / `change-me` | 初始化管理员 |
+| `ONETOUCH_AUTH_SECRET` | `change-this-secret` | 令牌签名密钥（非调试需 ≥ 32 位） |
+| `ONETOUCH_DATABASE_URL` | `~/.one-touch/words.db` | SQLite 位置 |
+| `ONETOUCH_ALLOWED_ORIGINS` | `localhost:5173`、`127.0.0.1:5173` | CORS 白名单 |
+| `ONETOUCH_REVIEW_ALGORITHM` | `sm2` | `sm2` 或 `fsrs` |
+| `ONETOUCH_TARGET_RETRIEVABILITY` | `0.9` | FSRS 目标可提取度 |
+| `ONETOUCH_REVIEW_TIMEZONE` / `_DAY_BOUNDARY_HOUR` | `Asia/Shanghai` / `4` | 「今天」从几点算起 |
+| `ONETOUCH_ENRICH_DAILY_LIMIT` | `5` | 每用户每日 AI 增强次数 |
+| `ONETOUCH_LLM_PROVIDER` | `ollama` | `openai` · `anthropic` · `doubao` · `ollama` |
+| `ONETOUCH_LLM_MODEL`、`_BASE_URL`、`_API_KEY`、`_OPENAI_API_KEY`、`_ANTHROPIC_API_KEY`、`_DOUBAO_API_KEY` | — | 模型凭据，仅服务端 |
+| `ONETOUCH_REGISTRATION_ENABLED` / `_MAX_USERS` | `false` / `30` | 邮箱验证码自助注册 |
+| `ONETOUCH_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_TLS` | — | 验证码邮件（未配置时写到日志） |
+| `ONETOUCH_BACKUP_ENABLED` / `_DIR` / `_RETENTION_DAYS` / `_INTERVAL_HOURS` | `true` / `~/.one-touch/backups` / `7` / `24` | SQLite 备份 |
+| `ONETOUCH_LOG_DIR` | `~/.one-touch/logs` | `app.log` 与 `access.log` |
+| `ONETOUCH_DEBUG` | `false` | 跳过生产密钥校验 |
 
 前端在构建期读取 `VITE_API_BASE_URL`、`VITE_APP_VERSION`、`VITE_BUILD_DATE`、`VITE_ICP_RECORD`。
 
@@ -146,7 +148,7 @@ docker compose up -d --build
 ```
 
 Compose 会起后端、前端静态镜像和 nginx 网关（80/443，证书挂到 `/etc/letsencrypt`）。数据库、
-备份与日志等持久状态放在 `glm_words_data` 卷的 `/data` 下。
+备份与日志等持久状态放在 `onetouch_data` 卷的 `/data` 下。
 
 ## 目录结构
 
@@ -192,8 +194,8 @@ node scripts/design/audit.mjs /tmp/audit
 ## 安全说明
 
 - LLM Key 只放服务端，前端不接触。
-- 生产环境务必设置强 `GLM_WORDS_AUTH_SECRET`，并改掉默认管理员口令。
-- 在网关终止 TLS，`GLM_WORDS_ALLOWED_ORIGINS` 保持最小。
+- 生产环境务必设置强 `ONETOUCH_AUTH_SECRET`，并改掉默认管理员口令。
+- 在网关终止 TLS，`ONETOUCH_ALLOWED_ORIGINS` 保持最小。
 - 不要提交 `.env`、`*.db`、备份、日志和运行时 JSONL。
 
 ## License

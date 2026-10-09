@@ -72,7 +72,7 @@ export default function WordDetailPage() {
 
   const [typedBaseline, setTypedBaseline] = useState(JSON.stringify(emptyTypedForm()));
   const [handwritingDraft, setHandwritingDraft] = useState<{ image: string | null; ink: string | null }>({ image: null, ink: null });
-  const draftStorageKey = `glm-detail-editor-v2:${getCurrentUserId()}:${id}`;
+  const draftStorageKey = `onetouch-detail-editor-v2:${getCurrentUserId()}:${id}`;
   const [recoverable, setRecoverable] = useState(() => localStorage.getItem(draftStorageKey) !== null);
   const typedDirty = (typedAdding || typedEditId !== null) && JSON.stringify(typedForm) !== typedBaseline;
   const inkDirty = fullscreenOpen && (handwritingDraft.image !== fullscreenInitial.image || handwritingDraft.ink !== fullscreenInitial.ink);
@@ -84,7 +84,7 @@ export default function WordDetailPage() {
   }, [draftStorageKey, typedForm, typedEditId, typedAdding, fullscreenEditId, fullscreenOpen, handwritingDraft, fullscreenInitial]);
   const discardDraft = useCallback(async () => {
     if (draftTimer.current) clearTimeout(draftTimer.current);
-    const key = `glm-words-ink-draft:user-${getCurrentUserId()}:detail-${id}-${fullscreenEditId ?? 'new'}`;
+    const key = `onetouch-ink-draft:user-${getCurrentUserId()}:detail-${id}-${fullscreenEditId ?? 'new'}`;
     await deleteDraftRecord(key);
     localStorage.removeItem(key); localStorage.removeItem(draftStorageKey); setRecoverable(false);
   }, [id, fullscreenEditId, draftStorageKey]);
@@ -178,7 +178,7 @@ export default function WordDetailPage() {
   };
 
   const clearDraft = async (wordId: number, defId: number | null) => {
-    const key = `glm-words-ink-draft:user-${getCurrentUserId()}:detail-${wordId}-${defId ?? 'new'}`;
+    const key = `onetouch-ink-draft:user-${getCurrentUserId()}:detail-${wordId}-${defId ?? 'new'}`;
     await deleteDraftRecord(key);
     localStorage.removeItem(key);
     localStorage.removeItem(draftStorageKey);

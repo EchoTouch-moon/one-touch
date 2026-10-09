@@ -180,7 +180,7 @@ This would provide automatic palm rejection without requiring manual "Touch" but
 
 ```bash
 # Backend (port 8001, due to 8000 occupied)
-GLM_WORDS_DEBUG=true uv run uvicorn backend.main:app --port 8001 --host 0.0.0.0
+ONETOUCH_DEBUG=true uv run uvicorn backend.main:app --port 8001 --host 0.0.0.0
 
 # Frontend (with LAN access)
 cd frontend && npm run dev -- --host

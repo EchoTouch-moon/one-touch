@@ -1,8 +1,8 @@
 import type { ReviewSession, ReviewSubmit } from '../types/review';
 
-const LEGACY_QUEUE_KEY = 'glm-words-pending-reviews';
-const sessionKey = (userId: number) => `glm-words-v2:${userId}:session`;
-const queuePrefix = (userId: number) => `glm-words-v2:${userId}:review:`;
+const LEGACY_QUEUE_KEY = 'onetouch-pending-reviews';
+const sessionKey = (userId: number) => `onetouch-v2:${userId}:session`;
+const queuePrefix = (userId: number) => `onetouch-v2:${userId}:review:`;
 const REVIEW_SESSION_MAX_AGE_MS = 5 * 60 * 1000;
 export interface PendingReview extends ReviewSubmit { id: string; created_at: string }
 const running = new Map<number, Promise<SyncResult>>();
@@ -12,7 +12,7 @@ function readJson<T>(key: string, fallback: T): T {
   try { return JSON.parse(window.localStorage.getItem(key) ?? 'null') ?? fallback; }
   catch { return fallback; } // Never erase unidentified or damaged learning data.
 }
-function changed() { window.dispatchEvent(new Event('glm-words-review-queue-updated')); }
+function changed() { window.dispatchEvent(new Event('onetouch-review-queue-updated')); }
 export function getLegacyReviews(): string | null { return window.localStorage.getItem(LEGACY_QUEUE_KEY); }
 export function getPendingReviews(userId: number): PendingReview[] {
   const prefix = queuePrefix(userId);
@@ -53,7 +53,7 @@ export function flushPendingReviews(userId: number, submit: (review: ReviewSubmi
   };
   // Web Locks serialize synchronization across tabs. Without them, retain data safely.
   const promise = (navigator.locks
-    ? navigator.locks.request(`glm-review-sync:${userId}`, work)
+    ? navigator.locks.request(`onetouch-review-sync:${userId}`, work)
     : Promise.resolve({ synced: 0, remaining: getPendingReviews(userId).length, syncedWordIds: [], error: 'This browser cannot safely sync offline reviews. Use a browser with Web Locks support.' }))
     .finally(() => { if (running.get(userId) === promise) running.delete(userId); });
   running.set(userId, promise);

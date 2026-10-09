@@ -18,7 +18,7 @@ export function registerServiceWorker() {
         };
 
         if (registration.waiting) {
-          window.dispatchEvent(new CustomEvent('glm-words-update-ready', { detail: { activate: activateWaitingWorker } }));
+          window.dispatchEvent(new CustomEvent('onetouch-update-ready', { detail: { activate: activateWaitingWorker } }));
           return;
         }
 
@@ -27,7 +27,7 @@ export function registerServiceWorker() {
           if (!installing) return;
           installing.addEventListener('statechange', () => {
             if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              window.dispatchEvent(new CustomEvent('glm-words-update-ready', { detail: { activate: activateWaitingWorker } }));
+              window.dispatchEvent(new CustomEvent('onetouch-update-ready', { detail: { activate: activateWaitingWorker } }));
             }
           });
         });

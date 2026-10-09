@@ -53,14 +53,14 @@
 运行：
 
 ```bash
-python3 scripts/export_open_source.py /path/to/glm-words-public
+python3 scripts/export_open_source.py /path/to/onetouch-public
 ```
 
 脚本会创建一个脱敏副本，并排除运行时数据和个人文件。导出后仍建议手动检查：
 
 ```bash
-cd /path/to/glm-words-public
-rg -n "moonpulse|82\\.157|鲁ICP备|DOUBAO_API_KEY|SMTP_PASSWORD|AUTH_SECRET|sk-"
+cd /path/to/onetouch-public
+rg -n "moonpulse|82\\.157|鲁ICP备|ONETOUCH_ADMIN_PASSWORD|ONETOUCH_AUTH_SECRET|GLM_WORDS_ADMIN_PASSWORD|GLM_WORDS_AUTH_SECRET|DOUBAO_API_KEY|SMTP_PASSWORD|sk-"
 find . -name "*.db" -o -name "*.log" -o -name "*.jsonl"
 ```
 

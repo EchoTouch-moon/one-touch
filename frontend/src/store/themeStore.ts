@@ -35,7 +35,7 @@ export const useThemeStore = create<ThemeState>()(
       setTheme: (theme) => set({ theme }),
       toggleTheme: () => set({ theme: get().theme === 'paper' ? 'violet' : 'paper' }),
     }),
-    { name: 'glm-words-theme' },
+    { name: 'onetouch-theme' },
   ),
 );
 

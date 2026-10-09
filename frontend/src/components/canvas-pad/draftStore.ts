@@ -1,12 +1,17 @@
 import type { InkDraftRecord } from './types';
 
-const DB_NAME = 'glm-words-ink-drafts';
+const DB_NAME = 'onetouch-ink-drafts';
 const DB_VERSION = 1;
 const STORE_NAME = 'drafts';
+// Handwriting drafts written before the 2026-10-09 rename lived in this
+// database. They are copied across once and the old database is dropped.
+const LEGACY_DB_NAME = 'glm-words-ink-drafts';
 
-function openDraftDb(): Promise<IDBDatabase> {
+let legacyMigration: Promise<void> | null = null;
+
+function open(dbName: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    const request = window.indexedDB.open(dbName, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -16,6 +21,64 @@ function openDraftDb(): Promise<IDBDatabase> {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+function readAll(db: IDBDatabase): Promise<InkDraftRecord[]> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const request = tx.objectStore(STORE_NAME).getAll();
+    request.onsuccess = () => resolve((request.result as InkDraftRecord[]) ?? []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function dropDatabase(name: string): Promise<void> {
+  return new Promise((resolve) => {
+    const request = window.indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve(); // Keep going; the copy already succeeded.
+    request.onblocked = () => resolve();
+  });
+}
+
+/**
+ * Copies drafts out of the pre-rename database and deletes it. Failures are
+ * swallowed on purpose: a canvas that cannot migrate its old drafts must still
+ * open, and the legacy database is left untouched for a later attempt.
+ */
+function migrateLegacyDrafts(): Promise<void> {
+  if (!legacyMigration) {
+    legacyMigration = (async () => {
+      if (!('indexedDB' in window)) return;
+      let source: IDBDatabase | null = null;
+      try {
+        source = await open(LEGACY_DB_NAME);
+        const records = await readAll(source);
+        source.close();
+        source = null;
+        if (records.length) {
+          const target = await open(DB_NAME);
+          await new Promise<void>((resolve, reject) => {
+            const tx = target.transaction(STORE_NAME, 'readwrite');
+            for (const record of records) tx.objectStore(STORE_NAME).put(record);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+          target.close();
+        }
+        await dropDatabase(LEGACY_DB_NAME);
+      } catch {
+        /* Leave the legacy database in place; drafts stay readable from it. */
+      } finally {
+        source?.close();
+      }
+    })();
+  }
+  return legacyMigration;
+}
+
+function openDraftDb(): Promise<IDBDatabase> {
+  return migrateLegacyDrafts().then(() => open(DB_NAME));
 }
 
 export async function readDraftRecord(key: string): Promise<InkDraftRecord | null> {

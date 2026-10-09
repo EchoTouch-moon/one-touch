@@ -1,4 +1,4 @@
-const CACHE_NAME = 'glm-words-shell-v7';
+const CACHE_NAME = 'onetouch-shell-v8';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/pwa-192.png', '/pwa-512.png'];
 
 self.addEventListener('install', (event) => {

@@ -323,7 +323,7 @@ import { useCanvasPadController } from './canvas-pad/useCanvasPadController';
 ### Storage Migration
 
 - Existing localStorage drafts auto-migrated on first load
-- IndexedDB created automatically (`glm-words-ink-drafts`)
+- IndexedDB created automatically (`onetouch-ink-drafts`，旧库 `glm-words-ink-drafts` 会在首次打开时自动迁移并删除)
 - Legacy `ink_data` localStorage entries preserved as fallback
 
 ---

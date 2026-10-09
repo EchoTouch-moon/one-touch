@@ -170,7 +170,7 @@ function AccountMenu({ username, onFeedback }: { username: string | null; onFeed
           <button
             type="button"
             onClick={() => {
-              const event = new CustomEvent('glm-words-before-logout', { cancelable: true, detail: logout });
+              const event = new CustomEvent('onetouch-before-logout', { cancelable: true, detail: logout });
               if (window.dispatchEvent(event)) logout();
             }}
             className="flex w-full items-center gap-2.5 rounded-sm px-3 py-2.5 text-left text-meta text-ink-soft transition data-[focus]:bg-well data-[focus]:text-ink"

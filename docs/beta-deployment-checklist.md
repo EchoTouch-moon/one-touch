@@ -1,11 +1,13 @@
 # 内测部署检查清单
 
-更新时间：2026-05-22
+更新时间：2026-10-09（环境变量前缀由 GLM_WORDS_ 改为 ONETOUCH_）
 
 ## 必做项
 
 - 轮换已经在聊天或文档中暴露过的 Ark / LLM API Key。
-- 设置强 `GLM_WORDS_AUTH_SECRET`，建议使用：
+- **环境变量前缀已从 `GLM_WORDS_` 改为 `ONETOUCH_`。** 旧名仍会作为兜底读取并打弃用日志，
+  所以线上 `.env` 不改也能跑；方便时把变量名换成新前缀即可，改完重启容器生效。
+- 设置强 `ONETOUCH_AUTH_SECRET`，建议使用：
 
 ```bash
 openssl rand -hex 32
@@ -14,8 +16,8 @@ openssl rand -hex 32
 - 设置强管理员密码：
 
 ```bash
-GLM_WORDS_ADMIN_USERNAME=your-admin-email
-GLM_WORDS_ADMIN_PASSWORD=long-random-password
+ONETOUCH_ADMIN_USERNAME=your-admin-email
+ONETOUCH_ADMIN_PASSWORD=long-random-password
 ```
 
 - 开启 HTTPS。
@@ -30,31 +32,31 @@ GLM_WORDS_ADMIN_PASSWORD=long-random-password
 - 仅在服务器环境变量里配置 LLM Key：
 
 ```bash
-GLM_WORDS_LLM_PROVIDER=doubao
-GLM_WORDS_LLM_MODEL=doubao-seed-2-0-pro-260215
-GLM_WORDS_DOUBAO_API_KEY=your-rotated-ark-key
-GLM_WORDS_LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
-GLM_WORDS_ENRICH_DAILY_LIMIT=5
+ONETOUCH_LLM_PROVIDER=doubao
+ONETOUCH_LLM_MODEL=doubao-seed-2-0-pro-260215
+ONETOUCH_DOUBAO_API_KEY=your-rotated-ark-key
+ONETOUCH_LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+ONETOUCH_ENRICH_DAILY_LIMIT=5
 ```
 
 - 如需开放邮箱验证码注册，设置：
 
 ```bash
-GLM_WORDS_REGISTRATION_ENABLED=true
-GLM_WORDS_REGISTRATION_MAX_USERS=30
-GLM_WORDS_EMAIL_VERIFICATION_TTL_MINUTES=10
+ONETOUCH_REGISTRATION_ENABLED=true
+ONETOUCH_REGISTRATION_MAX_USERS=30
+ONETOUCH_EMAIL_VERIFICATION_TTL_MINUTES=10
 ```
 
 - 生产发送验证码建议配置 SMTP：
 
 ```bash
-GLM_WORDS_MAIL_PROVIDER=smtp
-GLM_WORDS_SMTP_HOST=smtp.example.com
-GLM_WORDS_SMTP_PORT=587
-GLM_WORDS_SMTP_USERNAME=your-smtp-user
-GLM_WORDS_SMTP_PASSWORD=your-smtp-password
-GLM_WORDS_SMTP_FROM=no-reply@example.com
-GLM_WORDS_SMTP_TLS=true
+ONETOUCH_MAIL_PROVIDER=smtp
+ONETOUCH_SMTP_HOST=smtp.example.com
+ONETOUCH_SMTP_PORT=587
+ONETOUCH_SMTP_USERNAME=your-smtp-user
+ONETOUCH_SMTP_PASSWORD=your-smtp-password
+ONETOUCH_SMTP_FROM=no-reply@example.com
+ONETOUCH_SMTP_TLS=true
 ```
 
 未配置 SMTP 时会使用 `console` 模式，验证码只写入后端日志，适合本地调试，不适合正式内测。
@@ -63,13 +65,25 @@ GLM_WORDS_SMTP_TLS=true
   - 只会更新 `users.password_hash`。
   - 不会删除用户的词库、复习记录、手写数据或同步数据。
 
+## 卷名变更（2026-10-09）
+
+compose 里的数据卷已从 `glm_words_data` 改名为 `onetouch_data`。**卷名换了就等于换了一块空盘**，
+用仓库 `docker-compose.yml` 重新部署前，先把旧卷改名，否则应用会以一个空数据库启动：
+
+```bash
+docker volume rename glm_words_data onetouch_data
+```
+
+已经在跑的实例不用动：卷是按现有 compose 文件挂载的，改名只影响下一次用新文件创建容器。
+如果不确定当前挂的是哪个卷，先 `docker volume ls` 和 `docker inspect <容器>` 确认再操作。
+
 ## 建议项
 
 - 开启备份：
 
 ```bash
-GLM_WORDS_BACKUP_ENABLED=true
-GLM_WORDS_BACKUP_RETENTION_DAYS=7
+ONETOUCH_BACKUP_ENABLED=true
+ONETOUCH_BACKUP_RETENTION_DAYS=7
 ```
 
 - Admin / Settings / Runtime 检查：

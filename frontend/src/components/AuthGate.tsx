@@ -101,8 +101,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       logout();
       toast.error('Session expired. Please log in again.');
     };
-    window.addEventListener('glm-words-auth-expired', handleExpired);
-    return () => window.removeEventListener('glm-words-auth-expired', handleExpired);
+    window.addEventListener('onetouch-auth-expired', handleExpired);
+    return () => window.removeEventListener('onetouch-auth-expired', handleExpired);
   }, [logout]);
 
   if (!initialized) {

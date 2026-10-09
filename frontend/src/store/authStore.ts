@@ -195,7 +195,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'glm-words-auth',
+      name: 'onetouch-auth',
       partialize: (state) => ({
         token: state.token,
         userId: state.userId,
@@ -206,6 +206,6 @@ export const useAuthStore = create<AuthState>()(
   ),
 );
 
-window.addEventListener('glm-words-auth-expired', () => {
+window.addEventListener('onetouch-auth-expired', () => {
   useAuthStore.getState().logout();
 });

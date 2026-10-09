@@ -217,7 +217,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   },
 }));
 
-window.addEventListener('glm-words-session-changed', () => {
+window.addEventListener('onetouch-session-changed', () => {
   startSessionTask = null;
   useReviewStore.setState({ ...sessionStateFromCards([], { due_count: 0, reviewed_today: 0, total_words: 0, estimated_due_tomorrow: 0 }, false), pendingReviews: 0, error: null });
 });

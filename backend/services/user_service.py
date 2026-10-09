@@ -76,7 +76,7 @@ async def consume_invite_code(session: AsyncSession, invite_code_id: int, user_i
 
 
 async def create_invite_code(session: AsyncSession, created_by: int) -> InviteCode:
-    code_str = f"glm-{secrets.token_urlsafe(24)}"
+    code_str = f"onetouch-{secrets.token_urlsafe(24)}"
     code = InviteCode(code=code_str, created_by=created_by)
     session.add(code)
     await session.flush()

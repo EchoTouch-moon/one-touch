@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from backend.auth import decode_token_if_valid, ensure_account_active, require_auth
-from backend.config import AppConfig
+from backend.config import AppConfig, ensure_data_dir
 from backend.database import Base, create_engine_and_session
 from backend.security import IpRateLimiter, LoginRateLimiter, validate_production_secrets
 
@@ -35,7 +35,7 @@ def configure_file_logging(config: AppConfig) -> None:
 
     access_handler = logging.FileHandler(log_dir / "access.log", encoding="utf-8")
     access_handler.setFormatter(formatter)
-    logging.getLogger("glm_words.access").addHandler(access_handler)
+    logging.getLogger("onetouch.access").addHandler(access_handler)
 
 
 def create_app(config: AppConfig | None = None) -> FastAPI:
@@ -43,6 +43,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         config = AppConfig()
     configure_file_logging(config)
     validate_production_secrets(config)
+
+    # Runs before the engine is built so the default SQLite path points at the
+    # directory that actually holds existing data (see ensure_data_dir).
+    ensure_data_dir()
 
     engine, session_maker = create_engine_and_session(config)
 
@@ -56,8 +60,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         from backend.passwords import hash_password
         from sqlalchemy import select as sa_select
 
-        db_path = Path.home() / ".glm-words"
-        db_path.mkdir(parents=True, exist_ok=True)
+        # The state directory is prepared in create_app(); nothing to do here
+        # beyond making sure it exists for non-default database locations.
+        Path(config.ops.backup_dir).mkdir(parents=True, exist_ok=True)
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -243,7 +248,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             allow_headers=["*"],
         )
 
-    access_logger = logging.getLogger("glm_words.access")
+    access_logger = logging.getLogger("onetouch.access")
 
     @app.middleware("http")
     async def access_log_middleware(request: Request, call_next):

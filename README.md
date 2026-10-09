@@ -121,8 +121,8 @@ npm run dev                   # http://127.0.0.1:5173 — proxies /api to :8000
 ```
 
 The admin account from `.env` is created on first start; the Kaoyan corpus in `data/kaoyan/`
-is seeded into the database at the same time. SQLite lives at `~/.glm-words/words.db` unless
-`GLM_WORDS_DATABASE_URL` says otherwise.
+is seeded into the database at the same time. SQLite lives at `~/.one-touch/words.db` unless
+`ONETOUCH_DATABASE_URL` says otherwise.
 
 > **About the Kaoyan corpus.** `data/kaoyan/` is generated locally by `scripts/kaoyan/` from
 > exam papers and a third-party dictionary, and is **not distributed with the source** — those
@@ -135,25 +135,27 @@ is seeded into the database at the same time. SQLite lives at `~/.glm-words/word
 
 ### Configuration
 
-Everything is environment-driven; see `.env.example` for a starting point.
+Everything is environment-driven; see `.env.example` for a starting point. All variables are
+prefixed `ONETOUCH_`; the previous `GLM_WORDS_` names are still read as a fallback so an existing
+deployment keeps working, but they log a deprecation warning — rename them when convenient.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GLM_WORDS_ADMIN_USERNAME` / `_PASSWORD` | `admin` / `change-me` | Seed admin account |
-| `GLM_WORDS_AUTH_SECRET` | `change-this-secret` | Token signing key (≥ 32 chars outside debug) |
-| `GLM_WORDS_DATABASE_URL` | `~/.glm-words/words.db` | SQLite location |
-| `GLM_WORDS_ALLOWED_ORIGINS` | `localhost:5173`, `127.0.0.1:5173` | CORS allow-list |
-| `GLM_WORDS_REVIEW_ALGORITHM` | `sm2` | `sm2` or `fsrs` |
-| `GLM_WORDS_TARGET_RETRIEVABILITY` | `0.9` | FSRS scheduling target |
-| `GLM_WORDS_REVIEW_TIMEZONE` / `_DAY_BOUNDARY_HOUR` | `Asia/Shanghai` / `4` | When "today" starts |
-| `GLM_WORDS_ENRICH_DAILY_LIMIT` | `5` | AI enrich calls per user per day |
-| `GLM_WORDS_LLM_PROVIDER` | `ollama` | `openai` · `anthropic` · `doubao` · `ollama` |
-| `GLM_WORDS_LLM_MODEL`, `_BASE_URL`, `_API_KEY`, `_OPENAI_API_KEY`, `_ANTHROPIC_API_KEY`, `_DOUBAO_API_KEY` | — | Provider credentials, server-side only |
-| `GLM_WORDS_REGISTRATION_ENABLED` / `_MAX_USERS` | `false` / `30` | Email-code self-registration |
-| `GLM_WORDS_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_TLS` | — | Mail for codes (logs the code when unset) |
-| `GLM_WORDS_BACKUP_ENABLED` / `_DIR` / `_RETENTION_DAYS` / `_INTERVAL_HOURS` | `true` / `~/.glm-words/backups` / `7` / `24` | SQLite backups |
-| `GLM_WORDS_LOG_DIR` | `~/.glm-words/logs` | `app.log` and `access.log` |
-| `GLM_WORDS_DEBUG` | `false` | Skips the production secret check |
+| `ONETOUCH_ADMIN_USERNAME` / `_PASSWORD` | `admin` / `change-me` | Seed admin account |
+| `ONETOUCH_AUTH_SECRET` | `change-this-secret` | Token signing key (≥ 32 chars outside debug) |
+| `ONETOUCH_DATABASE_URL` | `~/.one-touch/words.db` | SQLite location |
+| `ONETOUCH_ALLOWED_ORIGINS` | `localhost:5173`, `127.0.0.1:5173` | CORS allow-list |
+| `ONETOUCH_REVIEW_ALGORITHM` | `sm2` | `sm2` or `fsrs` |
+| `ONETOUCH_TARGET_RETRIEVABILITY` | `0.9` | FSRS scheduling target |
+| `ONETOUCH_REVIEW_TIMEZONE` / `_DAY_BOUNDARY_HOUR` | `Asia/Shanghai` / `4` | When "today" starts |
+| `ONETOUCH_ENRICH_DAILY_LIMIT` | `5` | AI enrich calls per user per day |
+| `ONETOUCH_LLM_PROVIDER` | `ollama` | `openai` · `anthropic` · `doubao` · `ollama` |
+| `ONETOUCH_LLM_MODEL`, `_BASE_URL`, `_API_KEY`, `_OPENAI_API_KEY`, `_ANTHROPIC_API_KEY`, `_DOUBAO_API_KEY` | — | Provider credentials, server-side only |
+| `ONETOUCH_REGISTRATION_ENABLED` / `_MAX_USERS` | `false` / `30` | Email-code self-registration |
+| `ONETOUCH_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_TLS` | — | Mail for codes (logs the code when unset) |
+| `ONETOUCH_BACKUP_ENABLED` / `_DIR` / `_RETENTION_DAYS` / `_INTERVAL_HOURS` | `true` / `~/.one-touch/backups` / `7` / `24` | SQLite backups |
+| `ONETOUCH_LOG_DIR` | `~/.one-touch/logs` | `app.log` and `access.log` |
+| `ONETOUCH_DEBUG` | `false` | Skips the production secret check |
 
 The frontend reads `VITE_API_BASE_URL`, `VITE_APP_VERSION`, `VITE_BUILD_DATE` and
 `VITE_ICP_RECORD` at build time.
@@ -167,7 +169,7 @@ docker compose up -d --build
 
 Compose runs the API, a static frontend image and an nginx gateway on ports 80/443 (mount your
 certificates under `/etc/letsencrypt`). Persistent state — database, backups, logs — lives in
-the `glm_words_data` volume at `/data`.
+the `onetouch_data` volume at `/data`.
 
 ## Project layout
 
@@ -213,8 +215,8 @@ node scripts/design/audit.mjs /tmp/audit
 ## Security notes
 
 - Keep LLM keys server-side; the frontend never receives them.
-- Set a strong `GLM_WORDS_AUTH_SECRET` and a non-default admin password in production.
-- Terminate TLS at the gateway and keep `GLM_WORDS_ALLOWED_ORIGINS` narrow.
+- Set a strong `ONETOUCH_AUTH_SECRET` and a non-default admin password in production.
+- Terminate TLS at the gateway and keep `ONETOUCH_ALLOWED_ORIGINS` narrow.
 - Never commit `.env`, `*.db`, backups, logs or runtime JSONL.
 
 ## License

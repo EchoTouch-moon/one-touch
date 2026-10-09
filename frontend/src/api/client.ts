@@ -47,10 +47,10 @@ api.interceptors.response.use(
       if (requestToken && requestToken !== getCurrentAuthToken()) {
         return Promise.reject(error);
       }
-      window.localStorage.removeItem('glm-words-auth');
+      window.localStorage.removeItem('onetouch-auth');
       const suppress = error?.config?.headers?.['X-Suppress-Auth-Expired-Toast'];
       if (!suppress) {
-        window.dispatchEvent(new Event('glm-words-auth-expired'));
+        window.dispatchEvent(new Event('onetouch-auth-expired'));
       }
     }
     return Promise.reject(error);

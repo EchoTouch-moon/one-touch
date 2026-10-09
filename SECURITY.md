@@ -10,7 +10,7 @@ This repository is intended for self-hosted beta usage and public source release
 
 ## Running a public copy
 
-- Use `openssl rand -hex 32` for `GLM_WORDS_AUTH_SECRET`.
+- Use `openssl rand -hex 32` for `ONETOUCH_AUTH_SECRET`.
 - Keep LLM provider keys server-side only.
 - Enable HTTPS in production.
 - Prefer a separate public repository or exported copy for open-source release.

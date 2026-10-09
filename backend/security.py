@@ -20,11 +20,11 @@ def validate_production_secrets(config: AppConfig) -> None:
 
     unsafe = []
     if config.admin_username == DEFAULT_ADMIN_USERNAME:
-        unsafe.append("GLM_WORDS_ADMIN_USERNAME")
+        unsafe.append("ONETOUCH_ADMIN_USERNAME")
     if config.admin_password == DEFAULT_ADMIN_PASSWORD:
-        unsafe.append("GLM_WORDS_ADMIN_PASSWORD")
+        unsafe.append("ONETOUCH_ADMIN_PASSWORD")
     if config.auth_secret == DEFAULT_AUTH_SECRET or len(config.auth_secret) < 32:
-        unsafe.append("GLM_WORDS_AUTH_SECRET")
+        unsafe.append("ONETOUCH_AUTH_SECRET")
 
     if unsafe:
         names = ", ".join(unsafe)

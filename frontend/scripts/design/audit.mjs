@@ -325,7 +325,7 @@ const storageState = {
   origins: [{
     origin: BASE,
     localStorage: [{
-      name: 'glm-words-auth',
+      name: 'onetouch-auth',
       value: JSON.stringify({
         state: { token: session.token, userId: session.user_id, username: session.username, role: session.role },
         version: 0,

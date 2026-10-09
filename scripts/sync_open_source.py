@@ -230,7 +230,7 @@ def main() -> int:
 
     ensure_clean_target(target, force=args.force_target_overwrite)
 
-    with tempfile.TemporaryDirectory(prefix="glm-words-open-source-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="onetouch-open-source-") as tmp:
         exported = Path(tmp) / "export"
         export_open_source(source, exported)
         sync_tree(exported, target)

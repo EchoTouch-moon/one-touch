@@ -42,7 +42,7 @@ describe('offline review persistence', () => {
     expect(getPendingReviews(1)).toHaveLength(1);
   });
   it('retains unknown legacy records without assigning them to a user', () => {
-    localStorage.setItem('glm-words-pending-reviews', JSON.stringify([event]));
+    localStorage.setItem('onetouch-pending-reviews', JSON.stringify([event]));
     expect(getPendingReviews(1)).toEqual([]); expect(getLegacyReviews()).toContain('2026-10-01');
   });
   it('does not share cached sessions between users', () => {

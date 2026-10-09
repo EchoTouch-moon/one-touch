@@ -1,5 +1,5 @@
 [project]
-name = "glm-words"
+name = "onetouch"
 version = "0.1.0"
 description = "Vocabulary learning web app with spaced repetition"
 readme = "README.md"

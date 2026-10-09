@@ -55,7 +55,7 @@ export default function QuickCapturePage() {
   const [capturing, setCapturing] = useState(false);
   const capturingRef = useRef(false);
   const [sessionWords, setSessionWords] = useState<Word[]>([]);
-  const draftStorageKey = `glm-capture-editor-v2:${getCurrentUserId()}`;
+  const draftStorageKey = `onetouch-capture-editor-v2:${getCurrentUserId()}`;
   const [recoverable, setRecoverable] = useState(() => window.localStorage.getItem(draftStorageKey) !== null);
   const [text, setText] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -91,7 +91,7 @@ export default function QuickCapturePage() {
   const discardDraft = useCallback(async () => {
     if (draftTimer.current) clearTimeout(draftTimer.current);
     if (capturedWord) {
-      const key = `glm-words-ink-draft:user-${getCurrentUserId()}:word-${capturedWord.id}`;
+      const key = `onetouch-ink-draft:user-${getCurrentUserId()}:word-${capturedWord.id}`;
       await deleteDraftRecord(key);
       window.localStorage.removeItem(key);
     }
@@ -253,7 +253,7 @@ export default function QuickCapturePage() {
   }, [text, captureWord, isValidEnglish, savedInputMode, showDropdown, selectedIdx, applySuggestion, suggestions, navigate]);
 
   const clearHandwritingDraft = useCallback(async (wordId: number) => {
-    const key = `glm-words-ink-draft:user-${getCurrentUserId()}:word-${wordId}`;
+    const key = `onetouch-ink-draft:user-${getCurrentUserId()}:word-${wordId}`;
     await deleteDraftRecord(key);
     window.localStorage.removeItem(key);
     window.localStorage.removeItem(draftStorageKey);

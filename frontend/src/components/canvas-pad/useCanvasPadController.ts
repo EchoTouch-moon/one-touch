@@ -166,7 +166,7 @@ export function useCanvasPadController({
     }
   }, [paperGuide]);
 
-  const draftStorageKey = draftKey ? `glm-words-ink-draft:${draftKey}` : null;
+  const draftStorageKey = draftKey ? `onetouch-ink-draft:${draftKey}` : null;
 
   useEffect(() => {
     onChangeRef.current = onChange;

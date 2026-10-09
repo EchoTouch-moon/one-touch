@@ -24,8 +24,8 @@ export function useUnsavedChanges(dirty: boolean, keep: () => Promise<void> | vo
       event.preventDefault();
       setAction(() => (event as CustomEvent<() => void>).detail);
     };
-    window.addEventListener('glm-words-before-logout', beforeLogout);
-    return () => window.removeEventListener('glm-words-before-logout', beforeLogout);
+    window.addEventListener('onetouch-before-logout', beforeLogout);
+    return () => window.removeEventListener('onetouch-before-logout', beforeLogout);
   }, [dirty]);
   useEffect(() => {
     if (!dirty) return;

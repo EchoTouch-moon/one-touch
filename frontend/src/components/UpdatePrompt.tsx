@@ -13,8 +13,8 @@ export default function UpdatePrompt() {
       }
     };
 
-    window.addEventListener('glm-words-update-ready', handleUpdateReady);
-    return () => window.removeEventListener('glm-words-update-ready', handleUpdateReady);
+    window.addEventListener('onetouch-update-ready', handleUpdateReady);
+    return () => window.removeEventListener('onetouch-update-ready', handleUpdateReady);
   }, []);
 
   if (!activate) return null;

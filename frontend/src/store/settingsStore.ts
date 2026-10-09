@@ -31,6 +31,6 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setDefinitionInputMode: (mode) => set({ definitionInputMode: mode }),
     }),
-    { name: 'glm-words-settings' },
+    { name: 'onetouch-settings' },
   ),
 );

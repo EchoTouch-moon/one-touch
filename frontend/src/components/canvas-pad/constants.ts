@@ -28,7 +28,7 @@ export const MAX_POINT_JUMP = 120;
 
 export const PEN_WEIGHTS = [0.4, 0.7, 1.0] as const;
 export const PEN_WEIGHT_LABELS = ['fine', 'standard', 'bold'] as const;
-export const PEN_WEIGHT_STORAGE_KEY = 'glm-words-pen-weight';
+export const PEN_WEIGHT_STORAGE_KEY = 'onetouch-pen-weight';
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 4;
@@ -38,7 +38,7 @@ export const PAPER_WIDTH = 600;
 export const PAPER_HEIGHT = 800;
 export const DEFAULT_PAPER: DocSize = { width: PAPER_WIDTH, height: PAPER_HEIGHT };
 
-export const PAPER_GUIDE_KEY = 'glm-words-paper-guide';
+export const PAPER_GUIDE_KEY = 'onetouch-paper-guide';
 export const PAPER_GUIDE_OPTIONS: readonly PaperGuide[] = ['plain', 'lines', 'grid'];
 export const LINE_SPACING = 50;
 export const GRID_SPACING = 40;

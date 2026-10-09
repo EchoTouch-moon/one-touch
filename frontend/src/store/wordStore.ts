@@ -75,7 +75,7 @@ export const useWordStore = create<WordState>((set) => ({
   },
 }));
 
-window.addEventListener('glm-words-session-changed', () => {
+window.addEventListener('onetouch-session-changed', () => {
   requestSequence += 1;
   useWordStore.setState({ words: [], total: 0, page: 1, loading: false, error: null });
 });

@@ -6,12 +6,12 @@ services:
     env_file:
       - .env
     environment:
-      GLM_WORDS_DATABASE_URL: sqlite+aiosqlite:////data/words.db
-      GLM_WORDS_ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,http://127.0.0.1:8080,https://words.example.com,https://example.com,https://www.example.com
-      GLM_WORDS_BACKUP_DIR: /data/backups
-      GLM_WORDS_LOG_DIR: /data/logs
+      ONETOUCH_DATABASE_URL: sqlite+aiosqlite:////data/words.db
+      ONETOUCH_ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,http://127.0.0.1:8080,https://words.example.com,https://example.com,https://www.example.com
+      ONETOUCH_BACKUP_DIR: /data/backups
+      ONETOUCH_LOG_DIR: /data/logs
     volumes:
-      - glm_words_data:/data
+      - onetouch_data:/data
     restart: unless-stopped
 
   frontend:
@@ -35,4 +35,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  glm_words_data:
+  onetouch_data:
